@@ -9,7 +9,7 @@ Build mode: fast
 
 ## Slices
 
-- [ ] **1. The approved Android shell builds cleanly**
+- [x] **1. The approved Android shell builds cleanly**
   Becomes usable: A minimal Visual Time debug APK is produced locally with the permanent `com.kisss.visualtime` identity, true-black edge-to-edge surface, portrait phone request, and the approved stable toolchain. This is the critical-risk exception; the first functional/visual checkpoint remains slice 2.
   Why now: SDK 37 and the AGP built-in Kotlin/Compose Compiler combination must be proven before feature code grows. A real successful build exposes dependency metadata or plugin incompatibility while correction is still cheap.
   PRD ref: `prd.md > Screens and Layout`, `prd.md > What We're Building`
