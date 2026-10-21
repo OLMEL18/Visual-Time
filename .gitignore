@@ -1,0 +1,36 @@
+/devpost/learner-profile.md
+
+# Local Android/Gradle state and build outputs
+/local.properties
+/.gradle/
+/.kotlin/
+**/build/
+/captures/
+/.externalNativeBuild/
+/.cxx/
+*.apk
+*.aab
+*.hprof
+
+# IDE and operating-system files
+/.idea/
+/.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Credentials, environment files, and signing material
+.env
+.env.*
+!.env.example
+*.jks
+*.keystore
+keystore.properties
+signing.properties
+
+# Local agent/workflow packages are not application source
+/.agents/
+/.claude/
+/.codex/
+/agent/
+/skills-lock.json
