@@ -1,7 +1,10 @@
 package com.kisss.visualtime
 
 import androidx.lifecycle.ViewModel
+import com.kisss.visualtime.data.RecentDurationsPolicy
+import com.kisss.visualtime.data.RecentDurationsStore
 import com.kisss.visualtime.timer.DurationFormatter
+import com.kisss.visualtime.timer.DurationInputValidator
 import com.kisss.visualtime.timer.MonotonicClock
 import com.kisss.visualtime.timer.TimerEngine
 import com.kisss.visualtime.timer.TimerSession
@@ -11,15 +14,55 @@ import kotlinx.coroutines.flow.asStateFlow
 
 class VisualTimeViewModel(
     private val clock: MonotonicClock,
+    private val recentDurationsStore: RecentDurationsStore,
 ) : ViewModel() {
     private val mutableUiState = MutableStateFlow(VisualTimeUiState())
     val uiState: StateFlow<VisualTimeUiState> = mutableUiState.asStateFlow()
 
     private var session: TimerSession? = null
+    private var recentDurationsInitialized = false
 
-    fun startQuickDuration(durationMinutes: Int) {
+    suspend fun initializeRecentDurations() {
+        if (recentDurationsInitialized) return
+        recentDurationsInitialized = true
+        val durations = recentDurationsStore.loadOrSeed()
+        mutableUiState.value = mutableUiState.value.copy(
+            quickStartMinutes = durations,
+            recentDurationsLoaded = true,
+        )
+    }
+
+    fun onManualDraftChanged(value: String) {
+        val existingError = mutableUiState.value.validationMessage
+        mutableUiState.value = mutableUiState.value.copy(
+            manualDraft = value,
+            validationMessage = if (
+                existingError != null && DurationInputValidator.parseValidMinutes(value) != null
+            ) {
+                null
+            } else {
+                existingError
+            },
+        )
+    }
+
+    suspend fun startQuickDuration(durationMinutes: Int) {
         require(durationMinutes > 0) { "Duration must be positive." }
-        startSession(durationMinutes, updateRecent(durationMinutes))
+        startDuration(durationMinutes)
+    }
+
+    suspend fun startManualDuration(): Boolean {
+        val durationMinutes = DurationInputValidator.parseValidMinutes(
+            mutableUiState.value.manualDraft,
+        )
+        if (durationMinutes == null) {
+            mutableUiState.value = mutableUiState.value.copy(
+                validationMessage = DurationInputValidator.ErrorMessage,
+            )
+            return false
+        }
+        startDuration(durationMinutes)
+        return true
     }
 
     fun refreshFromClock() {
@@ -54,10 +97,10 @@ class VisualTimeViewModel(
         publishSnapshot(restartedSession, forcedPhase = TimerPhase.Running, nowElapsedMillis = now)
     }
 
-    fun repeat() {
+    suspend fun repeat() {
         if (mutableUiState.value.phase != TimerPhase.Finished) return
         val durationMinutes = mutableUiState.value.selectedDurationMinutes ?: return
-        startSession(durationMinutes, updateRecent(durationMinutes))
+        startDuration(durationMinutes)
     }
 
     fun backToSetup() {
@@ -70,15 +113,23 @@ class VisualTimeViewModel(
         )
     }
 
-    private fun startSession(durationMinutes: Int, recents: List<Int>) {
+    private suspend fun startDuration(durationMinutes: Int) {
+        val optimisticRecents = RecentDurationsPolicy.recordStarted(
+            current = mutableUiState.value.quickStartMinutes,
+            durationMinutes = durationMinutes,
+        )
         val now = clock.elapsedRealtimeMillis()
         val newSession = TimerEngine.start(durationMinutes, now)
         session = newSession
         mutableUiState.value = mutableUiState.value.copy(
-            quickStartMinutes = recents,
+            quickStartMinutes = optimisticRecents,
+            recentDurationsLoaded = true,
+            validationMessage = null,
             selectedDurationMinutes = durationMinutes,
         )
         publishSnapshot(newSession, forcedPhase = TimerPhase.Running, nowElapsedMillis = now)
+        val persistedRecents = recentDurationsStore.recordStarted(durationMinutes)
+        mutableUiState.value = mutableUiState.value.copy(quickStartMinutes = persistedRecents)
     }
 
     private fun publishSnapshot(
@@ -105,9 +156,4 @@ class VisualTimeViewModel(
             ),
         )
     }
-
-    private fun updateRecent(durationMinutes: Int): List<Int> =
-        (listOf(durationMinutes) + mutableUiState.value.quickStartMinutes)
-            .distinct()
-            .take(3)
 }

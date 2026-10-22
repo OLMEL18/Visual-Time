@@ -9,7 +9,10 @@ enum class TimerPhase {
 
 data class VisualTimeUiState(
     val phase: TimerPhase = TimerPhase.Setup,
-    val quickStartMinutes: List<Int> = listOf(15, 25, 40),
+    val quickStartMinutes: List<Int> = emptyList(),
+    val recentDurationsLoaded: Boolean = false,
+    val manualDraft: String = "",
+    val validationMessage: String? = null,
     val selectedDurationMinutes: Int? = null,
     val elapsedProgress: Float = 0f,
     val formattedRemainingTime: String? = null,

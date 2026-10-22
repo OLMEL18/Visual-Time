@@ -128,7 +128,7 @@ Implements `prd.md > Look and Feel`, `prd.md > Screens and Layout`, and `scope.m
 - Begin with warm sand around `#E2B76B`, subtly translucent cool-gray glass, and restrained dark-metal or warm-neutral supports. These are fixed POC theme values, not user settings.
 - Use the Android/system sans-serif family. The remaining-time style uses tabular numerals and a fixed container wide enough for `24:00:00`, preventing horizontal movement as digits change.
 - Use compact rounded charcoal/translucent panels, subtle outlines, light but non-glaring text, visible labels, and touch targets of at least roughly 48 dp.
-- Keep the hourglass in a stable layout layer. Setup, overlay, pause indicator, and finished controls are drawn in separate overlay layers and must never measure or reposition it.
+- Keep the hourglass in a stable layout layer. The top quick-start panel, bottom manual-entry panel, overlay, pause indicator, and finished controls are drawn in separate overlay layers and must never measure or reposition it.
 - The hourglass bounds are derived from stable window constraints and capped on wider displays. IME insets are not applied to its geometry, so opening the keyboard cannot resize or recenter it under `adjustNothing`.
 - Draw the hourglass procedurally: symmetric curved glass paths, fine contours and restrained reflection, clipped nonrectangular sand piles, and one continuous-looking narrow stream. Avoid dashed lines, stacked repeated strokes, rectangular chamber fills, heavy glow, celebratory motion, or particle-physics objects.
 - A small deterministic cosmetic phase may vary the stream and surface texture while flowing. That phase stops when paused/finished and never determines timer progress.
@@ -139,7 +139,7 @@ Implements `prd.md > Look and Feel`, `prd.md > Screens and Layout`, and `scope.m
 
 `MainActivity` is the only activity. It enables edge-to-edge drawing, uses transparent/black system-bar treatment, hosts the Compose tree, and connects activity lifecycle visibility to the ViewModel's UI pulse. The manifest sets `android:windowSoftInputMode="adjustNothing"` and requests portrait for the phone activity.
 
-The Compose content applies safe drawing/cutout top and horizontal insets to the setup panel and navigation-bar bottom insets to timer controls. It deliberately does not apply IME resizing/padding to the hourglass layer. The system IME gets the first opportunity to consume Android Back; screen-level Back behavior then follows the timer state.
+The Compose content applies safe drawing/cutout top and horizontal insets to the top quick-start panel, and navigation-bar bottom insets to the bottom manual-entry panel and timer controls. IME insets apply only to the bottom manual-entry panel so it clears the keyboard; they never resize or reposition the hourglass or top panel. The system IME gets the first opportunity to consume Android Back; screen-level Back behavior then follows the timer state.
 
 Implements `prd.md > Screens and Layout` and `prd.md > Background, Relaunch, and System Back`.
 
@@ -209,11 +209,11 @@ Implements `prd.md > Quick Starts and Recent Durations` and `prd.md > Background
 
 Reference: [Preferences DataStore](https://developer.android.com/topic/libraries/architecture/datastore).
 
-### Setup Panel
+### Setup Panels
 
-`SetupPanel` renders the title, zero to three quick-start buttons, manual field, Start action, and inline validation in a compact top safe area. It does not request focus at creation or return. The row tolerates an intentionally empty history without placeholder buttons.
+`SetupQuickStartPanel` renders the title and zero to three quick-start buttons in a compact top safe area. Its row tolerates an intentionally empty history without placeholder buttons. `ManualDurationPanel` separately renders the manual field, Start action, and inline validation in a compact bottom safe area. Neither panel requests input focus at creation or return.
 
-The top panel is positioned independently of the hourglass and does not use IME padding. With `adjustNothing`, the keyboard may cover only the lower hourglass while the panel, input, and Start remain stationary and visible. This behavior is a mandatory physical-device checkpoint.
+Both panels are positioned independently of the hourglass. With `adjustNothing`, the top panel and hourglass stay stationary; only the bottom manual-entry panel uses Compose IME insets to remain visible above the keyboard. This Xiaomi-dependent behavior is a mandatory physical-device checkpoint.
 
 Implements `prd.md > Setup State`, `prd.md > Quick Starts and Recent Durations`, and `prd.md > Manual Duration and Validation`.
 
@@ -322,7 +322,7 @@ Add final control surfaces, system Back rules, pause indicator, finished present
 
 ### 6. Targeted Verification
 
-Run deterministic unit tests and the small Compose interaction suite, then install the current debug APK on the phone. Manually verify keyboard visibility, Done, Start, keyboard-first Back, `adjustNothing`, stable hourglass geometry, overlay tap isolation, five-second hiding, pause dismissal, session Back behavior, live-process foreground return, expiry, and performance. Emulator checks are optional and must not delay the phone demo.
+Run deterministic unit tests and the small Compose interaction suite, then install the current debug APK on the phone. Manually verify keyboard visibility, Done, Start, keyboard-first Back, `adjustNothing`, stable top panel/hourglass geometry, bottom entry-panel IME clearance, overlay tap isolation, five-second hiding, pause dismissal, session Back behavior, live-process foreground return, expiry, and performance. Emulator checks are optional and must not delay the phone demo.
 
 ## Testing Plan
 
@@ -347,7 +347,7 @@ The suite intentionally excludes screenshot/golden infrastructure, broad automat
 
 ### Physical-Device Checklist
 
-The Redmi Note 9 Pro/API 31 is authoritative for the POC checkpoint. Inspect visual quality by eye and exercise actual Xiaomi keyboard/window behavior. In particular, confirm that `adjustNothing` keeps the top setup panel, input, Start button, and hourglass geometry stationary while the keyboard may cover the lower hourglass. If it does not, record the observed movement/occlusion and propose the smallest platform-compatible adjustment before changing the UX; do not silently add a custom keypad.
+The Redmi Note 9 Pro/API 31 is authoritative for the POC checkpoint. Inspect visual quality by eye and exercise actual Xiaomi keyboard/window behavior. In particular, confirm that `adjustNothing` keeps the top quick-start panel and hourglass geometry stationary while the bottom manual-entry panel clears the keyboard and keeps its input and Start action visible. If it does not, record the observed movement/occlusion and propose the smallest platform-compatible adjustment before changing the UX; do not silently add a custom keypad.
 
 ## File Structure
 
@@ -424,7 +424,7 @@ The only external build inputs are the Android SDK, JDK, Gradle/AGP, Kotlin/Comp
 
 - **SDK 37, dependency, Kotlin, or Compose Compiler resolution fails** → preserve the exact Gradle error and stop at the toolchain smoke test. Propose the smallest stable compatible correction; never silently downgrade, bypass metadata, add the legacy Kotlin Android plugin, or use experimental versions.
 - **The sand reads as a fill animation rather than a physical quantity** → iterate the procedural silhouette, clipped curved piles, and stream during the early phone checkpoint before building the remaining UI. If the threshold still threatens the deadline, present the observed tradeoff before changing an agreed feature.
-- **Xiaomi IME behavior moves the panel/hourglass or obscures input/Start despite `adjustNothing`** → capture the exact on-device behavior and propose the smallest inset/window-policy adjustment. Do not introduce a custom keypad or change the approved interaction without agreement.
+- **Xiaomi IME behavior moves the top panel/hourglass or lets the keyboard obscure the bottom input/Start despite `adjustNothing` plus panel-scoped IME insets** → capture the exact on-device behavior and propose the smallest inset/window-policy adjustment. Do not introduce a custom keypad or change the approved interaction without agreement.
 - **Stored recent-duration text is malformed** → sanitize to valid unique 1–1,440 values without crashing. A present value that becomes empty remains empty and is not reseeded.
 
 ## What Was Simplified and Why
@@ -453,7 +453,7 @@ The only external build inputs are the Android SDK, JDK, Gradle/AGP, Kotlin/Comp
 ### Useful Unknowns and Agreed Investigations
 
 - **Visual sand quality is the largest genuine unknown.** Requirements describe the target, but the convincing balance of silhouette, mound geometry, stream width, texture, and performance cannot be settled on paper. The agreed investigation is the early minimal debug APK on the Redmi Note 9 Pro, followed by focused Canvas iteration before full UI polish.
-- **`adjustNothing` behavior on the Xiaomi device is platform/IME dependent.** The agreed investigation verifies keyboard opening, IME Done, Start, Back dismissal, stationary top panel, and invariant hourglass bounds on the actual phone. Any fallback is discussed from observed evidence rather than assumed now.
+- **`adjustNothing` behavior on the Xiaomi device is platform/IME dependent.** The agreed investigation verifies keyboard opening, IME Done, Start, Back dismissal, a stationary top panel and invariant hourglass bounds, plus bottom manual-panel clearance on the actual phone. Any fallback is discussed from observed evidence rather than assumed now.
 
 ### Resolved Compatibility Decision
 

@@ -17,7 +17,7 @@ Source: scope.md > The Core Loop, scope.md > What “Working” Looks Like
 2. On a fresh installation where no saved quick-start list exists, the top setup panel shows 15, 25, and 40 minutes. Otherwise it shows the saved three-item list, including an intentionally empty stored list if one exists.
 3. The user either taps a quick-start value to begin immediately or enters a whole-minute duration from 1 through 1,440 and presses Start or the keyboard Done action.
 4. A started duration moves to the front of the unique, locally persisted, three-item most-recently-used list. Merely typing does not change the list.
-5. The keyboard is dismissed, the setup panel fades away, and the hourglass begins from a full upper chamber and empty lower chamber without moving or resizing.
+5. The keyboard is dismissed, both setup panels fade away, and the hourglass begins from a full upper chamber and empty lower chamber without moving or resizing.
 6. During normal running, only the hourglass is visible. Sand depletion, flow, and accumulation reflect the actual remaining proportion.
 7. A tap reveals remaining time and Pause/Resume, Restart, and Back controls. While running, the overlay hides after five seconds without interaction or immediately after a background tap.
 8. Pause freezes the timer and sand. The controls and time remain visible unless the user explicitly dismisses them; a dismissed paused state retains a small pause indicator.
@@ -34,13 +34,14 @@ Visual Time uses one full-screen surface whose content changes between setup, ru
 
 - True-black full-screen background.
 - Large stationary Sand hourglass, already in its initial full-upper/empty-lower pose.
-- Compact dark setup panel anchored at the top:
+- Compact dark quick-start panel anchored at the top:
   - “Visual Time” title.
   - One row containing up to three quick-start duration buttons in current MRU order.
-  - Below the row, a minutes input labelled for the 1–1,440 range with a Start button beside it.
+- Separate compact dark manual-entry panel anchored at the bottom:
+  - A minutes input labelled for the 1–1,440 range with a Start button beside it.
   - Short inline validation feedback appears near the input when required.
 - The input is not focused automatically, and the keyboard does not open on launch or on return to setup.
-- The system numeric keyboard may cover the lower hourglass, but the top panel remains fixed and the hourglass is not resized, recentered, or reflowed. The input and Start action remain visible while typing.
+- When the system numeric keyboard opens, only the bottom manual-entry panel clears it so the input and Start action remain visible. The top quick-start panel and hourglass remain fixed; the hourglass is not resized, recentered, or reflowed.
 
 ### Running and Paused States
 
@@ -102,7 +103,7 @@ Source: scope.md > The POC Boundary, scope.md > Acceptance Criteria
 
 - A valid manual Start, valid Done action, or quick-start tap starts a session and updates the MRU list.
 - Any visible keyboard is dismissed.
-- The complete setup panel fades away smoothly.
+- Both setup panels fade away smoothly.
 - The hourglass stays visually stable and begins at the full-duration pose.
 - The clean running state initially shows no numeric countdown or controls.
 

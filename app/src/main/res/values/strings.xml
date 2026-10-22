@@ -2,6 +2,10 @@
 <resources>
     <string name="app_name">Visual Time</string>
     <string name="quick_start_minutes">%1$d min</string>
+    <string name="minutes_label">Minutes</string>
+    <string name="minutes_hint">1–1440</string>
+    <string name="start">Start</string>
+    <string name="duration_validation">Enter 1–1440 minutes</string>
     <string name="finished">Finished</string>
     <string name="repeat">Repeat</string>
     <string name="back_to_setup">Back to setup</string>

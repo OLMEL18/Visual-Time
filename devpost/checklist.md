@@ -40,7 +40,7 @@ Build mode: fast
   Learner check: Tap a quick start, confirm the setup disappears without moving the hourglass, watch the sand advance, and use a short valid timer, edited demo footage, or a test-only time mechanism as needed to inspect the unmistakable Finished state, Repeat, and Back. Do not add a permanent acceleration control to the shipping POC.
   Commit: `Add accurate quick-start timer flow`
 
-- [ ] **4. Manual durations and recent history work safely**
+- [x] **4. Manual durations and recent history work safely**
   Becomes usable: A user can type or paste 1–1,440 whole minutes, start with the button or IME Done, receive inline validation for bad input, and reuse a locally persisted unique three-item MRU list with correct first-launch versus stored-empty behavior.
   Why now: Once the accurate timer path exists, manual input and persistence can reuse it instead of creating a second start path. The missing-versus-empty rule is isolated and testable before controls add more states.
   PRD ref: `prd.md > Quick Starts and Recent Durations`, `prd.md > Manual Duration and Validation`, `prd.md > Starting a Session`, `prd.md > States and Boundaries`
@@ -94,3 +94,4 @@ Activity mode: [live app and editor, explicit static fallback, focused alternati
 ## Revisions
 
 - 2026-10-22 — Slice 2 visual checkpoint approved after a shared-profile geometry pass. The lower mound remains somewhat conical; the learner accepted it for the POC and deferred a smoother lower free-surface model to optional Slice 6 polish. This does not alter scope, PRD, or specification.
+- 2026-10-22 — During Slice 4, the learner moved the manual Minutes field and Start action from the top setup panel to a separate bottom panel. Only that bottom panel may clear the IME; the quick-start panel and hourglass remain fixed. This is a layout refinement within the approved POC and does not alter scope.

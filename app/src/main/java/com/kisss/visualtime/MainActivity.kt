@@ -7,6 +7,8 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.kisss.visualtime.data.RecentDurationsRepository
+import com.kisss.visualtime.data.visualTimeDataStore
 import com.kisss.visualtime.timer.AndroidMonotonicClock
 import com.kisss.visualtime.ui.VisualTimeScreen
 import com.kisss.visualtime.ui.theme.VisualTimeTheme
@@ -20,10 +22,15 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
         )
 
+        val recentDurationsRepository = RecentDurationsRepository(applicationContext.visualTimeDataStore)
+
         setContent {
             VisualTimeTheme {
                 val viewModel: VisualTimeViewModel = viewModel(
-                    factory = VisualTimeViewModelFactory(AndroidMonotonicClock),
+                    factory = VisualTimeViewModelFactory(
+                        clock = AndroidMonotonicClock,
+                        recentDurationsStore = recentDurationsRepository,
+                    ),
                 )
                 VisualTimeScreen(viewModel = viewModel)
             }

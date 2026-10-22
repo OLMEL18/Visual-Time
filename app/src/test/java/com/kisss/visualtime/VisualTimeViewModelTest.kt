@@ -1,15 +1,19 @@
 package com.kisss.visualtime
 
 import com.kisss.visualtime.timer.MonotonicClock
+import com.kisss.visualtime.data.RecentDurationsPolicy
+import com.kisss.visualtime.data.RecentDurationsStore
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
 class VisualTimeViewModelTest {
     @Test
-    fun quickStartRunsToFinishedThenRepeatAndBackUseTheSameSessionDuration() {
+    fun quickStartRunsToFinishedThenRepeatAndBackUseTheSameSessionDuration() = runBlocking {
         val clock = FakeMonotonicClock()
-        val viewModel = VisualTimeViewModel(clock)
+        val viewModel = createViewModel(clock)
+        viewModel.initializeRecentDurations()
 
         viewModel.startQuickDuration(15)
         assertEquals(TimerPhase.Running, viewModel.uiState.value.phase)
@@ -39,9 +43,10 @@ class VisualTimeViewModelTest {
     }
 
     @Test
-    fun pauseResumeAndRestartDoNotLoseOrInventElapsedTime() {
+    fun pauseResumeAndRestartDoNotLoseOrInventElapsedTime() = runBlocking {
         val clock = FakeMonotonicClock()
-        val viewModel = VisualTimeViewModel(clock)
+        val viewModel = createViewModel(clock)
+        viewModel.initializeRecentDurations()
         viewModel.startQuickDuration(25)
 
         clock.nowMillis = 100_000L
@@ -65,9 +70,10 @@ class VisualTimeViewModelTest {
     }
 
     @Test
-    fun longSessionKeepsLongFormatAtCompletion() {
+    fun longSessionKeepsLongFormatAtCompletion() = runBlocking {
         val clock = FakeMonotonicClock()
-        val viewModel = VisualTimeViewModel(clock)
+        val viewModel = createViewModel(clock)
+        viewModel.initializeRecentDurations()
         viewModel.startQuickDuration(90)
         assertEquals("01:30:00", viewModel.uiState.value.formattedRemainingTime)
 
@@ -77,9 +83,47 @@ class VisualTimeViewModelTest {
         assertEquals("00:00:00", viewModel.uiState.value.formattedRemainingTime)
     }
 
+    @Test
+    fun manualDraftIsSeparateFromQuickStartsAndInvalidInputDoesNotStart() = runBlocking {
+        val viewModel = createViewModel(FakeMonotonicClock())
+        viewModel.initializeRecentDurations()
+
+        viewModel.onManualDraftChanged("30")
+        viewModel.startQuickDuration(25)
+        viewModel.backToSetup()
+        assertEquals("30", viewModel.uiState.value.manualDraft)
+
+        viewModel.onManualDraftChanged("999999999999999999999999")
+        assertEquals(false, viewModel.startManualDuration())
+        assertEquals(TimerPhase.Setup, viewModel.uiState.value.phase)
+        assertEquals("Enter 1–1440 minutes", viewModel.uiState.value.validationMessage)
+
+        viewModel.onManualDraftChanged("40")
+        assertNull(viewModel.uiState.value.validationMessage)
+        assertEquals(true, viewModel.startManualDuration())
+        assertEquals(TimerPhase.Running, viewModel.uiState.value.phase)
+        assertEquals(listOf(40, 25, 15), viewModel.uiState.value.quickStartMinutes)
+    }
+
+    private fun createViewModel(clock: FakeMonotonicClock): VisualTimeViewModel =
+        VisualTimeViewModel(clock, FakeRecentDurationsStore())
+
     private class FakeMonotonicClock(
         var nowMillis: Long = 0L,
     ) : MonotonicClock {
         override fun elapsedRealtimeMillis(): Long = nowMillis
+    }
+
+    private class FakeRecentDurationsStore(
+        initial: List<Int> = RecentDurationsPolicy.Defaults,
+    ) : RecentDurationsStore {
+        private var durations = initial
+
+        override suspend fun loadOrSeed(): List<Int> = durations
+
+        override suspend fun recordStarted(durationMinutes: Int): List<Int> {
+            durations = RecentDurationsPolicy.recordStarted(durations, durationMinutes)
+            return durations
+        }
     }
 }
