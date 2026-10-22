@@ -30,7 +30,7 @@ Build mode: fast
   Approval record: On 2026-10-22, the learner explicitly approved the on-device Slice 2 prototype as sufficient for the hackathon POC. The shared inner-wall geometry, conserved-volume mapping, fixed stream origin, sand-wall contact, and clean completion are accepted. The remaining somewhat conical lower mound is a known non-blocking limitation; a smoother lower free-surface model is optional Slice 6 polish only if core functionality is already complete.
   Commit: `Prototype flowing hourglass Canvas`
 
-- [ ] **3. Quick starts run an accurate visual timer to completion**
+- [x] **3. Quick starts run an accurate visual timer to completion**
   Becomes usable: The setup surface offers 15, 25, and 40 quick starts; tapping one immediately enters the clean hourglass countdown, sand follows monotonic elapsed time, and expiry shows the final lower pile with Finished, fixed-format zero, Repeat, and Back.
   Why now: This replaces the visual prototype driver with the product's real kernel—time becoming a shrinking physical quantity—before adding input and control complexity.
   PRD ref: `prd.md > The Core Journey` (steps 1–6 and 10), `prd.md > Starting a Session`, `prd.md > Sand Progress and Time Display`, `prd.md > Restart, Back, and Completion`
