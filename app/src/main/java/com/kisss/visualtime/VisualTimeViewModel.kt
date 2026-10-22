@@ -21,6 +21,7 @@ class VisualTimeViewModel(
 
     private var session: TimerSession? = null
     private var recentDurationsInitialized = false
+    private var overlayHideDeadlineElapsedMillis: Long? = null
 
     suspend fun initializeRecentDurations() {
         if (recentDurationsInitialized) return
@@ -68,7 +69,34 @@ class VisualTimeViewModel(
     fun refreshFromClock() {
         if (mutableUiState.value.phase != TimerPhase.Running) return
         val currentSession = session ?: return
-        publishSnapshot(currentSession)
+        val now = clock.elapsedRealtimeMillis()
+        publishSnapshot(currentSession, nowElapsedMillis = now)
+        if (
+            mutableUiState.value.phase == TimerPhase.Running &&
+            mutableUiState.value.overlayVisible &&
+            overlayHideDeadlineElapsedMillis?.let { now >= it } == true
+        ) {
+            dismissOverlay()
+        }
+    }
+
+    fun onTimerSurfaceTapped() {
+        if (mutableUiState.value.phase !in setOf(TimerPhase.Running, TimerPhase.Paused)) return
+        if (mutableUiState.value.overlayVisible) {
+            dismissOverlay()
+        } else {
+            revealOverlay()
+        }
+    }
+
+    fun onSystemBack() {
+        when (mutableUiState.value.phase) {
+            TimerPhase.Running, TimerPhase.Paused -> {
+                if (mutableUiState.value.overlayVisible) backToSetup() else revealOverlay()
+            }
+            TimerPhase.Finished -> backToSetup()
+            TimerPhase.Setup -> Unit
+        }
     }
 
     fun pause() {
@@ -77,7 +105,9 @@ class VisualTimeViewModel(
         val now = clock.elapsedRealtimeMillis()
         val pausedSession = TimerEngine.pause(currentSession, now)
         session = pausedSession
+        overlayHideDeadlineElapsedMillis = null
         publishSnapshot(pausedSession, forcedPhase = TimerPhase.Paused, nowElapsedMillis = now)
+        mutableUiState.value = mutableUiState.value.copy(overlayVisible = true)
     }
 
     fun resume() {
@@ -87,6 +117,8 @@ class VisualTimeViewModel(
         val resumedSession = TimerEngine.resume(currentSession, now)
         session = resumedSession
         publishSnapshot(resumedSession, forcedPhase = TimerPhase.Running, nowElapsedMillis = now)
+        mutableUiState.value = mutableUiState.value.copy(overlayVisible = true)
+        overlayHideDeadlineElapsedMillis = now + OVERLAY_TIMEOUT_MILLIS
     }
 
     fun restart() {
@@ -94,7 +126,9 @@ class VisualTimeViewModel(
         val now = clock.elapsedRealtimeMillis()
         val restartedSession = TimerEngine.restart(currentSession, now)
         session = restartedSession
+        overlayHideDeadlineElapsedMillis = null
         publishSnapshot(restartedSession, forcedPhase = TimerPhase.Running, nowElapsedMillis = now)
+        mutableUiState.value = mutableUiState.value.copy(overlayVisible = false)
     }
 
     suspend fun repeat() {
@@ -105,11 +139,13 @@ class VisualTimeViewModel(
 
     fun backToSetup() {
         session = null
+        overlayHideDeadlineElapsedMillis = null
         mutableUiState.value = mutableUiState.value.copy(
             phase = TimerPhase.Setup,
             selectedDurationMinutes = null,
             elapsedProgress = 0f,
             formattedRemainingTime = null,
+            overlayVisible = false,
         )
     }
 
@@ -121,11 +157,13 @@ class VisualTimeViewModel(
         val now = clock.elapsedRealtimeMillis()
         val newSession = TimerEngine.start(durationMinutes, now)
         session = newSession
+        overlayHideDeadlineElapsedMillis = null
         mutableUiState.value = mutableUiState.value.copy(
             quickStartMinutes = optimisticRecents,
             recentDurationsLoaded = true,
             validationMessage = null,
             selectedDurationMinutes = durationMinutes,
+            overlayVisible = false,
         )
         publishSnapshot(newSession, forcedPhase = TimerPhase.Running, nowElapsedMillis = now)
         val persistedRecents = recentDurationsStore.recordStarted(durationMinutes)
@@ -146,6 +184,9 @@ class VisualTimeViewModel(
         if (snapshot.expired && currentSession.runningStartedAtElapsedMillis != null) {
             session = TimerEngine.pause(currentSession, nowElapsedMillis)
         }
+        if (snapshot.expired) {
+            overlayHideDeadlineElapsedMillis = null
+        }
         mutableUiState.value = mutableUiState.value.copy(
             phase = phase,
             elapsedProgress = snapshot.elapsedProgress,
@@ -154,6 +195,26 @@ class VisualTimeViewModel(
                 expired = snapshot.expired,
                 format = currentSession.format,
             ),
+            overlayVisible = if (snapshot.expired) false else mutableUiState.value.overlayVisible,
         )
+    }
+
+    private fun revealOverlay() {
+        val phase = mutableUiState.value.phase
+        mutableUiState.value = mutableUiState.value.copy(overlayVisible = true)
+        overlayHideDeadlineElapsedMillis = if (phase == TimerPhase.Running) {
+            clock.elapsedRealtimeMillis() + OVERLAY_TIMEOUT_MILLIS
+        } else {
+            null
+        }
+    }
+
+    private fun dismissOverlay() {
+        overlayHideDeadlineElapsedMillis = null
+        mutableUiState.value = mutableUiState.value.copy(overlayVisible = false)
+    }
+
+    private companion object {
+        const val OVERLAY_TIMEOUT_MILLIS = 5_000L
     }
 }

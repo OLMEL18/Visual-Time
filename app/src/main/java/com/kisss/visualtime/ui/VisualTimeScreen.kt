@@ -4,7 +4,10 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.tween
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
@@ -29,6 +32,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -66,6 +70,11 @@ fun VisualTimeScreen(
     val coroutineScope = rememberCoroutineScope()
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
+    val timerSurfaceInteraction = remember { MutableInteractionSource() }
+
+    BackHandler(enabled = state.phase != TimerPhase.Setup) {
+        viewModel.onSystemBack()
+    }
 
     LaunchedEffect(viewModel) {
         viewModel.initializeRecentDurations()
@@ -85,7 +94,18 @@ fun VisualTimeScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(TrueBlack),
+            .background(TrueBlack)
+            .then(
+                if (state.phase == TimerPhase.Running || state.phase == TimerPhase.Paused) {
+                    Modifier.clickable(
+                        interactionSource = timerSurfaceInteraction,
+                        indication = null,
+                        onClick = viewModel::onTimerSurfaceTapped,
+                    )
+                } else {
+                    Modifier
+                },
+            ),
     ) {
         HourglassCanvas(
             elapsedProgress = state.elapsedProgress,
@@ -132,6 +152,28 @@ fun VisualTimeScreen(
                 onRepeat = { coroutineScope.launch { viewModel.repeat() } },
                 onBack = viewModel::backToSetup,
             )
+        }
+
+
+        AnimatedVisibility(
+            visible = state.phase in setOf(TimerPhase.Running, TimerPhase.Paused) &&
+                state.overlayVisible,
+            enter = fadeIn(tween(OVERLAY_FADE_MILLIS)),
+            exit = fadeOut(tween(OVERLAY_FADE_MILLIS)),
+        ) {
+            TimerOverlay(
+                formattedTime = state.formattedRemainingTime.orEmpty(),
+                isPaused = state.phase == TimerPhase.Paused,
+                onPauseResume = {
+                    if (state.phase == TimerPhase.Paused) viewModel.resume() else viewModel.pause()
+                },
+                onRestart = viewModel::restart,
+                onBack = viewModel::backToSetup,
+            )
+        }
+
+        if (state.phase == TimerPhase.Paused && !state.overlayVisible) {
+            PauseIndicator(modifier = Modifier.align(Alignment.TopCenter))
         }
     }
 }
@@ -318,5 +360,114 @@ private fun FinishedContent(
     }
 }
 
+@Composable
+internal fun TimerOverlay(
+    formattedTime: String,
+    isPaused: Boolean,
+    onPauseResume: () -> Unit,
+    onRestart: () -> Unit,
+    onBack: () -> Unit,
+) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Surface(
+            color = DarkCharcoal.copy(alpha = 0.86f),
+            shape = RoundedCornerShape(16.dp),
+            tonalElevation = 0.dp,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .statusBarsPadding()
+                .padding(top = 18.dp),
+        ) {
+            Text(
+                text = formattedTime,
+                color = SoftWhite,
+                style = MaterialTheme.typography.headlineMedium.merge(
+                    TextStyle(fontFeatureSettings = "tnum"),
+                ),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier
+                    .widthIn(min = 180.dp)
+                    .padding(horizontal = 18.dp, vertical = 10.dp),
+            )
+        }
+
+        Surface(
+            color = DarkCharcoal.copy(alpha = 0.94f),
+            shape = RoundedCornerShape(18.dp),
+            tonalElevation = 0.dp,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .widthIn(max = 520.dp)
+                .fillMaxWidth(),
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.padding(14.dp),
+            ) {
+                OverlayButton(
+                    text = stringResource(if (isPaused) R.string.resume else R.string.pause),
+                    emphasized = true,
+                    onClick = onPauseResume,
+                    modifier = Modifier.weight(1f),
+                )
+                OverlayButton(
+                    text = stringResource(R.string.restart),
+                    onClick = onRestart,
+                    modifier = Modifier.weight(1f),
+                )
+                OverlayButton(
+                    text = stringResource(R.string.back),
+                    onClick = onBack,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun OverlayButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    emphasized: Boolean = false,
+) {
+    Button(
+        onClick = onClick,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = if (emphasized) SandGold else DarkCharcoal,
+            contentColor = if (emphasized) TrueBlack else SoftWhite,
+        ),
+        shape = RoundedCornerShape(14.dp),
+        modifier = modifier.heightIn(min = 48.dp),
+    ) {
+        Text(text)
+    }
+}
+
+@Composable
+private fun PauseIndicator(modifier: Modifier = Modifier) {
+    Surface(
+        color = DarkCharcoal.copy(alpha = 0.72f),
+        shape = RoundedCornerShape(12.dp),
+        tonalElevation = 0.dp,
+        modifier = modifier
+            .statusBarsPadding()
+            .padding(top = 18.dp)
+            .widthIn(min = 86.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.paused),
+            color = SoftWhite.copy(alpha = 0.82f),
+            style = MaterialTheme.typography.labelLarge,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+        )
+    }
+}
+
 private const val TIMER_PULSE_MILLIS = 50L
 private const val SETUP_FADE_MILLIS = 220
+private const val OVERLAY_FADE_MILLIS = 160

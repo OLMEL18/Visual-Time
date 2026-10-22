@@ -5,7 +5,9 @@ import com.kisss.visualtime.data.RecentDurationsPolicy
 import com.kisss.visualtime.data.RecentDurationsStore
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class VisualTimeViewModelTest {
@@ -103,6 +105,93 @@ class VisualTimeViewModelTest {
         assertEquals(true, viewModel.startManualDuration())
         assertEquals(TimerPhase.Running, viewModel.uiState.value.phase)
         assertEquals(listOf(40, 25, 15), viewModel.uiState.value.quickStartMinutes)
+    }
+
+    @Test
+    fun runningOverlayRevealsAndAutoHidesAtFiveSeconds() = runBlocking {
+        val clock = FakeMonotonicClock()
+        val viewModel = createViewModel(clock)
+        viewModel.initializeRecentDurations()
+        viewModel.startQuickDuration(15)
+
+        assertFalse(viewModel.uiState.value.overlayVisible)
+        viewModel.onTimerSurfaceTapped()
+        assertTrue(viewModel.uiState.value.overlayVisible)
+
+        clock.nowMillis = 4_999L
+        viewModel.refreshFromClock()
+        assertTrue(viewModel.uiState.value.overlayVisible)
+
+        clock.nowMillis = 5_000L
+        viewModel.refreshFromClock()
+        assertFalse(viewModel.uiState.value.overlayVisible)
+    }
+
+    @Test
+    fun pausedOverlayDoesNotTimeoutButCanBeDismissedAndRevealed() = runBlocking {
+        val clock = FakeMonotonicClock()
+        val viewModel = createViewModel(clock)
+        viewModel.initializeRecentDurations()
+        viewModel.startQuickDuration(25)
+        viewModel.onTimerSurfaceTapped()
+
+        clock.nowMillis = 1_000L
+        viewModel.pause()
+        assertEquals(TimerPhase.Paused, viewModel.uiState.value.phase)
+        assertTrue(viewModel.uiState.value.overlayVisible)
+
+        clock.nowMillis = 60_000L
+        viewModel.refreshFromClock()
+        assertTrue(viewModel.uiState.value.overlayVisible)
+
+        viewModel.onTimerSurfaceTapped()
+        assertFalse(viewModel.uiState.value.overlayVisible)
+        viewModel.onTimerSurfaceTapped()
+        assertTrue(viewModel.uiState.value.overlayVisible)
+
+        viewModel.resume()
+        assertEquals(TimerPhase.Running, viewModel.uiState.value.phase)
+        assertTrue(viewModel.uiState.value.overlayVisible)
+        clock.nowMillis = 65_000L
+        viewModel.refreshFromClock()
+        assertFalse(viewModel.uiState.value.overlayVisible)
+    }
+
+    @Test
+    fun restartReturnsToCleanRunningViewAndSystemBackUsesTwoSteps() = runBlocking {
+        val clock = FakeMonotonicClock()
+        val viewModel = createViewModel(clock)
+        viewModel.initializeRecentDurations()
+        viewModel.startQuickDuration(15)
+
+        clock.nowMillis = 100_000L
+        viewModel.onSystemBack()
+        assertTrue(viewModel.uiState.value.overlayVisible)
+
+        viewModel.restart()
+        assertEquals(TimerPhase.Running, viewModel.uiState.value.phase)
+        assertEquals(0f, viewModel.uiState.value.elapsedProgress, 0.0001f)
+        assertFalse(viewModel.uiState.value.overlayVisible)
+
+        viewModel.onSystemBack()
+        assertTrue(viewModel.uiState.value.overlayVisible)
+        viewModel.onSystemBack()
+        assertEquals(TimerPhase.Setup, viewModel.uiState.value.phase)
+        assertFalse(viewModel.uiState.value.overlayVisible)
+    }
+
+    @Test
+    fun finishedSystemBackReturnsToSetup() = runBlocking {
+        val clock = FakeMonotonicClock()
+        val viewModel = createViewModel(clock)
+        viewModel.initializeRecentDurations()
+        viewModel.startQuickDuration(1)
+        clock.nowMillis = 60_000L
+        viewModel.refreshFromClock()
+
+        assertEquals(TimerPhase.Finished, viewModel.uiState.value.phase)
+        viewModel.onSystemBack()
+        assertEquals(TimerPhase.Setup, viewModel.uiState.value.phase)
     }
 
     private fun createViewModel(clock: FakeMonotonicClock): VisualTimeViewModel =

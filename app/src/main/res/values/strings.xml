@@ -9,4 +9,9 @@
     <string name="finished">Finished</string>
     <string name="repeat">Repeat</string>
     <string name="back_to_setup">Back to setup</string>
+    <string name="pause">Pause</string>
+    <string name="paused">Paused</string>
+    <string name="resume">Resume</string>
+    <string name="restart">Restart</string>
+    <string name="back">Back</string>
 </resources>

@@ -16,4 +16,5 @@ data class VisualTimeUiState(
     val selectedDurationMinutes: Int? = null,
     val elapsedProgress: Float = 0f,
     val formattedRemainingTime: String? = null,
+    val overlayVisible: Boolean = false,
 )

@@ -50,7 +50,7 @@ Build mode: fast
   Learner check: On the phone, start a valid manual duration, try invalid and pasted values, return to setup, reuse quick starts, and relaunch. Confirm the field/history behavior matches the approved examples and that no keyboard opens automatically.
   Commit: `Add validated durations and recent history`
 
-- [ ] **5. Tap-revealed controls manage the session without distraction**
+- [x] **5. Tap-revealed controls manage the session without distraction**
   Becomes usable: Running normally shows only the hourglass; a tap reveals stable time and Pause/Resume, Restart, and Back controls; timeout, paused visibility/dismissal, pause indicator, immediate restart/cancel, and system Back rules all behave consistently.
   Why now: The timer and start paths are already authoritative, so interaction controls can be added as transitions around one trusted session rather than debugging time math and gestures together.
   PRD ref: `prd.md > Running and Paused States`, `prd.md > Overlay and Pause`, `prd.md > Restart, Back, and Completion`, `prd.md > Background, Relaunch, and System Back`
