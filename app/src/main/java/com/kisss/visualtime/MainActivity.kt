@@ -6,11 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.ui.Modifier
+import com.kisss.visualtime.ui.PrototypeHourglassScreen
 import com.kisss.visualtime.ui.theme.VisualTimeTheme
 
 class MainActivity : ComponentActivity() {
@@ -22,14 +18,27 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
         )
 
+        val hasStaticProgress = intent.hasExtra(EXTRA_PROTOTYPE_PROGRESS)
+        val staticProgress = if (hasStaticProgress) {
+            intent.getFloatExtra(EXTRA_PROTOTYPE_PROGRESS, 0f).coerceIn(0f, 1f)
+        } else {
+            null
+        }
+        val staticFlowing = hasStaticProgress &&
+            intent.getBooleanExtra(EXTRA_PROTOTYPE_FLOWING, false)
+
         setContent {
             VisualTimeTheme {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.background),
+                PrototypeHourglassScreen(
+                    staticProgress = staticProgress,
+                    staticFlowing = staticFlowing,
                 )
             }
         }
+    }
+
+    private companion object {
+        const val EXTRA_PROTOTYPE_PROGRESS = "prototype_progress"
+        const val EXTRA_PROTOTYPE_FLOWING = "prototype_flowing"
     }
 }

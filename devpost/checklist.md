@@ -19,7 +19,7 @@ Build mode: fast
   Learner check: Review the reported effective toolchain and successful APK path, then confirm the GitHub owner and private-repository action when asked. No phone visual judgment is requested yet.
   Commit: `Bootstrap verified Android build` (after the initial safe `Document approved Visual Time plan` repository commit)
 
-- [ ] **2. A convincing hourglass prototype runs on the phone**
+- [x] **2. A convincing hourglass prototype runs on the phone**
   Becomes usable: The debug APK shows a large, stable custom Canvas hourglass on true black with warm nonrectangular sand piles and a fine continuous-looking stream. A clearly development-only looping/sample progress driver makes the full sand transition inspectable; it is replaced by the real timer in slice 3.
   Why now: The hourglass is the unique kernel and the largest uncertainty. Reviewing it on the actual display before building all controls prevents polishing a timer around an unconvincing visual.
   PRD ref: `prd.md > Look and Feel`, `prd.md > Screens and Layout > Setup State`, `prd.md > Sand Progress and Time Display`
@@ -27,6 +27,7 @@ Build mode: fast
   Build: Implement normalized hourglass geometry, cool-gray glass contours/reflection, restrained frame, curved/clipped upper and lower sand masses, and a lightweight cosmetic stream animation that runs only while flowing. Keep the hourglass bounds stable and independent of overlays/IME. Use only a development/test-only progress driver for this checkpoint; it must be replaced by the real timer in slice 3 and must not become a permanent demo-speed control. Build, install, and launch the APK on the authorized Redmi Note 9 Pro; do not add timer controls, Dial, settings, or grain physics.
   Verify (mechanical): Run `.\gradlew.bat assembleDebug`; install with ADB; launch `com.kisss.visualtime/.MainActivity`; confirm the process stays alive without crash/error logs; capture and inspect representative device states at approximately 0%, 25%, 50%, 75%, and 100% progress. Check redistribution, clipping/geometry artifacts, abrupt pile-shape changes, and that the stream appears only while progress is actively flowing. Confirm the visual driver stops work when not flowing and does not control authoritative timer state.
   Learner check: Pause after slice 2. On the Redmi Note 9 Pro, inspect approximately 0%, 25%, 50%, 75%, and 100% progress and review silhouette, glass restraint, natural redistribution, pile continuity, clipping/artifacts, stream visibility/fineness, smoothness, scale, and calm character. Resolve visual feedback before timer/UI expansion; this check does not introduce particle physics or new features.
+  Approval record: On 2026-10-22, the learner explicitly approved the on-device Slice 2 prototype as sufficient for the hackathon POC. The shared inner-wall geometry, conserved-volume mapping, fixed stream origin, sand-wall contact, and clean completion are accepted. The remaining somewhat conical lower mound is a known non-blocking limitation; a smoother lower free-surface model is optional Slice 6 polish only if core functionality is already complete.
   Commit: `Prototype flowing hourglass Canvas`
 
 - [ ] **3. Quick starts run an accurate visual timer to completion**
@@ -71,7 +72,7 @@ Build mode: fast
 
 ## Hands-on Checkpoints
 
-- [ ] Required pause after slice 2: learner completes the 0%/25%/50%/75%/100% hourglass phone review and visual feedback is resolved before full timer/UI expansion
+- [x] Required pause after slice 2: learner completed the expanded 0%/25%/50%/75%/90%/98%/99%/99.5%/100% hourglass review on the Redmi Note 9 Pro and explicitly approved the prototype before timer/UI expansion
 - [ ] Required pause after slice 6: final kick-the-tires exploration and feedback completed
 
 ## Final Review
@@ -91,3 +92,5 @@ Reflection: [offered/answered/declined/already covered — personal answer belon
 Activity mode: [live app and editor, explicit static fallback, focused alternative, prior practice, or recap]
 
 ## Revisions
+
+- 2026-10-22 — Slice 2 visual checkpoint approved after a shared-profile geometry pass. The lower mound remains somewhat conical; the learner accepted it for the POC and deferred a smoother lower free-surface model to optional Slice 6 polish. This does not alter scope, PRD, or specification.
