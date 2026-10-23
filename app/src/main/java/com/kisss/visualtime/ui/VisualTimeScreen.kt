@@ -30,6 +30,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -50,6 +52,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -89,6 +92,7 @@ fun VisualTimeScreen(
     val focusManager = LocalFocusManager.current
     val timerSurfaceInteraction = remember { MutableInteractionSource() }
     var finishedGraceActive by remember { mutableStateOf(false) }
+    var showAboutDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.phase, lifecycleOwner) {
         if (state.phase != TimerPhase.Finished) {
@@ -193,6 +197,7 @@ fun VisualTimeScreen(
                 minutes = state.quickStartMinutes,
                 manualDraft = state.manualDraft,
                 validationMessage = state.validationMessage,
+                onAbout = { showAboutDialog = true },
                 onQuickStart = { duration ->
                     keyboardController?.hide()
                     focusManager.clearFocus()
@@ -251,6 +256,15 @@ fun VisualTimeScreen(
         if (state.phase == TimerPhase.Paused && !state.overlayVisible) {
             PauseIndicator(modifier = Modifier.align(Alignment.TopCenter))
         }
+
+        if (state.phase == TimerPhase.Setup && showAboutDialog) {
+            val installedVersion = remember(context) { installedAppVersion(context) }
+            AboutDialog(
+                versionName = installedVersion,
+                onDismiss = { showAboutDialog = false },
+                onOpenLink = { url -> openAboutLink(context, url) },
+            )
+        }
     }
 }
 
@@ -259,6 +273,7 @@ private fun SetupControls(
     minutes: List<Int>,
     manualDraft: String,
     validationMessage: String?,
+    onAbout: () -> Unit,
     onQuickStart: (Int) -> Unit,
     onManualDraftChanged: (String) -> Unit,
     onManualStart: () -> Unit,
@@ -268,7 +283,11 @@ private fun SetupControls(
         SharedTopControlHost(
             modifier = Modifier.fillMaxSize(),
         ) {
-            SetupQuickStartPanel(minutes = minutes, onQuickStart = onQuickStart)
+            SetupQuickStartPanel(
+                minutes = minutes,
+                onQuickStart = onQuickStart,
+                onAbout = onAbout,
+            )
         }
         SharedBottomControlHost(
             referenceMinutes = minutes,
@@ -306,7 +325,11 @@ private fun SharedHourglass(
     SubcomposeLayout(modifier = modifier) { constraints ->
         val panelConstraints = constraints.copy(minWidth = 0, minHeight = 0)
         val topReference = subcompose(SharedLayoutSlot.TopReference) {
-            SetupQuickStartPanel(minutes = referenceMinutes, onQuickStart = {})
+            SetupQuickStartPanel(
+                minutes = referenceMinutes,
+                onQuickStart = {},
+                onAbout = {},
+            )
         }.single().measure(panelConstraints)
         val bottomReference = subcompose(SharedLayoutSlot.BottomReference) {
             ManualDurationPanel(
@@ -389,7 +412,11 @@ private fun SharedBottomControlHost(
     SubcomposeLayout(modifier = modifier) { constraints ->
         val panelConstraints = constraints.copy(minWidth = 0, minHeight = 0)
         val topReference = subcompose(SharedLayoutSlot.TopReference) {
-            SetupQuickStartPanel(minutes = referenceMinutes, onQuickStart = {})
+            SetupQuickStartPanel(
+                minutes = referenceMinutes,
+                onQuickStart = {},
+                onAbout = {},
+            )
         }.single().measure(panelConstraints)
         val bottomReference = subcompose(SharedLayoutSlot.BottomReference) {
             ManualDurationPanel(
@@ -421,6 +448,7 @@ private fun SharedBottomControlHost(
 private fun SetupQuickStartPanel(
     minutes: List<Int>,
     onQuickStart: (Int) -> Unit,
+    onAbout: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Surface(
@@ -434,15 +462,32 @@ private fun SetupQuickStartPanel(
             .fillMaxWidth(),
     ) {
         Column(
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(0.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
         ) {
-            Text(
-                text = stringResource(R.string.app_name),
-                color = SoftWhite,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Medium,
-            )
+            Box(
+                contentAlignment = Alignment.CenterStart,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.app_name),
+                    color = SoftWhite,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Medium,
+                )
+                IconButton(
+                    onClick = onAbout,
+                    modifier = Modifier.align(Alignment.CenterEnd),
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_info_outline),
+                        contentDescription = stringResource(R.string.about_content_description),
+                        tint = SoftWhite.copy(alpha = 0.84f),
+                    )
+                }
+            }
             if (minutes.isNotEmpty()) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),

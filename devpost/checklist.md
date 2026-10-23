@@ -85,7 +85,8 @@ control-panel anchor were explicitly approved on 2026-10-23.
 - [x] Checkpoint B retested by learner — background/locked-screen completion notification approved
 - [x] Approved launcher icon retested by learner — adaptive, legacy, and round launcher presentation approved
 - [x] Shared control spacing retested by learner — Setup, Running, Paused, and Finished panels use the same frame-relative anchor with safe keyboard/navigation insets
-- [ ] Final review complete — feedback resolved and learner confirms ready to ship
+- [x] About dialog retested by learner — Setup-only Info action, installed version, external legal links, dismissal, and unchanged timer layout approved
+- [x] Final review complete — feedback resolved and learner confirmed the Visual Time POC ready for shipping preparation on 2026-10-23; feature scope is frozen
 
 ## Code Tour and App Map
 

@@ -21,4 +21,20 @@
     <string name="background_alert_may_be_delayed">Exact alarms are unavailable; background completion may be delayed.</string>
     <string name="background_alert_unavailable">Background completion could not be scheduled on this device.</string>
     <string name="exact_alarm_access_explanation">Allow Alarms &amp; reminders for precise background completion alerts. The timer still works if you decline.</string>
+    <string name="about_content_description">About Visual Time</string>
+    <string name="about_title">About Visual Time</string>
+    <string name="about_app_name">App name: %1$s</string>
+    <string name="about_version">Version: %1$s</string>
+    <string name="about_version_unknown">Unknown</string>
+    <string name="about_description">Visual Time helps you see time passing through an animated hourglass. Choose a duration, stay focused, and receive a gentle alert when time runs out.</string>
+    <string name="about_developer">Developer: Keep It Simple Software Studio (KISS Studio)</string>
+    <string name="about_link">%1$s\n%2$s</string>
+    <string name="about_website">Website</string>
+    <string name="about_website_url">https://kiss.slet.org.ua/</string>
+    <string name="about_privacy_policy">Privacy Policy</string>
+    <string name="about_privacy_policy_url">https://kiss.slet.org.ua/privacy.html</string>
+    <string name="about_terms_of_use">Terms of Use</string>
+    <string name="about_terms_of_use_url">https://kiss.slet.org.ua/terms.html</string>
+    <string name="about_close">Close</string>
+    <string name="about_browser_unavailable">No browser is available to open this link.</string>
 </resources>
