@@ -90,15 +90,15 @@ control-panel anchor were explicitly approved on 2026-10-23.
 
 ## Code Tour and App Map
 
-- [ ] Learning activity complete — guided route, focused alternative, prior practice connected, or brief recap
-- [ ] Optional edit and transfer reflection addressed — offered/declined/already covered/not applicable as appropriate
-- [ ] `devpost/app-map.html` generated from finished code, checked, and shown, including a project-grounded practice to reuse
+- [x] Learning activity complete — guided route, focused alternative, prior practice connected, or brief recap
+- [x] Optional edit and transfer reflection addressed — offered/declined/already covered/not applicable as appropriate
+- [x] `devpost/app-map.html` generated from finished code, checked, and shown, including a project-grounded practice to reuse
 
-Activity and evidence: [what actually happened; real document/test/code references; unfinished work if interrupted]
-Route and stops: [actual paths and symbols; guided stops completed, or reference-only route]
-Edit outcome: [tried/kept/reverted/declined/not applicable; verification if changed]
-Reflection: [offered/answered/declined/already covered — personal answer belongs only in the ignored profile]
-Activity mode: [live app and editor, explicit static fallback, focused alternative, prior practice, or recap]
+Activity and evidence: Focused alternative connected the learner's repeatable plan-first goal to evidence from the build: `scope.md` protected the visible-time kernel; the Slice 2 real-device checkpoint exposed and resolved geometry mismatches; `TimerEngineTest.startAndMidpointUseMonotonicElapsedTime` and the final phone review separately verified timer authority and visual projection.
+Route and stops: Reference route follows `ui/VisualTimeScreen.kt` (`VisualTimeScreen`/`SetupControls`) → `VisualTimeViewModel.kt` (`startDuration`/`publishSnapshot`) → `timer/TimerEngine.kt` (`start`/`snapshot`), with result/storage branches to `ui/hourglass/HourglassCanvas.kt`, `ui/hourglass/HourglassGeometry.kt`, `data/RecentDurationsRepository.kt`, and `data/RecentDurationsPolicy.kt`.
+Edit outcome: Not applicable; the learner explicitly froze the approved application feature scope after final review, so the wrap-up added documentation only.
+Reflection: Already covered through the learner's repeated use of explicit acceptance checkpoints, deliberate scope decisions, and final scope freeze; no additional personal reflection was required or added to public artifacts.
+Activity mode: Focused alternative using prior hands-on practice plus a finished-code reference tour and offline app map.
 
 ## Revisions
 

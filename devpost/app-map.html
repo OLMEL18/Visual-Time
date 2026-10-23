@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Visual Time — App Map</title>
+  <style>
+    :root { color-scheme: dark; --bg:#000; --panel:#171717; --line:#4f565d; --text:#e7e3dc; --muted:#aaa49b; --sand:#e2b76b; }
+    * { box-sizing: border-box; }
+    body { margin:0; background:var(--bg); color:var(--text); font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif; }
+    main { width:min(980px,calc(100% - 32px)); margin:0 auto; padding:36px 0 64px; }
+    h1,h2,h3 { line-height:1.2; }
+    h1 { margin:0 0 8px; font-size:clamp(2rem,6vw,3.4rem); }
+    h2 { margin-top:36px; }
+    h3 { color:var(--sand); }
+    p { max-width:74ch; }
+    a { color:var(--sand); }
+    code { color:#f0cc8b; overflow-wrap:anywhere; }
+    .lede,.meta { color:var(--muted); }
+    .panel { background:var(--panel); border:1px solid #2d2d2d; border-radius:18px; padding:20px; margin:18px 0; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:14px; }
+    .card { background:#101010; border:1px solid #303030; border-radius:14px; padding:16px; }
+    .card h3 { margin:0 0 8px; font-size:1rem; }
+    ol,ul { padding-left:1.4rem; }
+    li + li { margin-top:10px; }
+    svg { width:100%; height:auto; display:block; }
+    .node { fill:#111; stroke:#666; stroke-width:2; }
+    .node.core { stroke:var(--sand); }
+    .arrow { stroke:var(--sand); stroke-width:2; fill:none; marker-end:url(#arrow); }
+    .svg-title { fill:var(--text); font:600 16px system-ui,sans-serif; }
+    .svg-detail { fill:var(--muted); font:13px system-ui,sans-serif; }
+    .badge { display:inline-block; border:1px solid #6c5838; border-radius:999px; padding:3px 9px; color:var(--sand); }
+    @media (max-width:640px) { main { width:min(100% - 22px,980px); padding-top:24px; } .panel { padding:15px; } }
+  </style>
+</head>
+<body>
+<main>
+  <span class="badge">Offline reference</span>
+  <h1>Visual Time app map</h1>
+  <p class="lede">Visual Time turns an accurate monotonic countdown into a calm physical signal: warm sand moves through a custom-drawn hourglass. One Compose activity coordinates Setup, Running, Paused, and Finished without a navigation graph.</p>
+  <p class="meta">Snapshot: commit <code>c7b64b0</code> · generated 2026-10-23. Later commits can make paths or behavior drift from this map.</p>
+
+  <section aria-labelledby="flow-title">
+    <h2 id="flow-title">One real action: start 25 minutes</h2>
+    <div class="panel">
+      <svg viewBox="0 0 900 330" role="img" aria-labelledby="diagram-title diagram-desc">
+        <title id="diagram-title">A quick-start action flowing through Visual Time</title>
+        <desc id="diagram-desc">The Compose screen sends a start event to the ViewModel. The ViewModel starts the monotonic timer, updates recent durations, and publishes progress. The screen passes progress to the hourglass Canvas.</desc>
+        <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#e2b76b"/></marker></defs>
+        <rect class="node" x="25" y="35" rx="15" width="235" height="82"/>
+        <text class="svg-title" x="45" y="68">VisualTimeScreen</text><text class="svg-detail" x="45" y="94">quick-start tap</text>
+        <rect class="node core" x="335" y="35" rx="15" width="235" height="82"/>
+        <text class="svg-title" x="355" y="68">VisualTimeViewModel</text><text class="svg-detail" x="355" y="94">startDuration(25)</text>
+        <rect class="node core" x="640" y="35" rx="15" width="235" height="82"/>
+        <text class="svg-title" x="660" y="68">TimerEngine</text><text class="svg-detail" x="660" y="94">monotonic session + snapshot</text>
+        <path class="arrow" d="M260 76 H330"/><path class="arrow" d="M570 76 H635"/>
+        <rect class="node" x="335" y="210" rx="15" width="235" height="82"/>
+        <text class="svg-title" x="355" y="243">RecentDurationsRepository</text><text class="svg-detail" x="355" y="269">persist MRU only after start</text>
+        <rect class="node" x="640" y="210" rx="15" width="235" height="82"/>
+        <text class="svg-title" x="660" y="243">HourglassCanvas</text><text class="svg-detail" x="660" y="269">render progress + flowing</text>
+        <path class="arrow" d="M450 117 V205"/><path class="arrow" d="M758 117 V205"/>
+        <path class="arrow" d="M640 251 H575"/>
+      </svg>
+    </div>
+  </section>
+
+  <section aria-labelledby="pieces-title">
+    <h2 id="pieces-title">The four pieces to remember</h2>
+    <div class="grid">
+      <article class="card"><h3>Timer engine</h3><p><code>timer/TimerEngine.kt</code> uses elapsed-realtime anchors to derive remaining milliseconds and normalized progress. Pause stores accumulated elapsed time; restart resets it. Animation frames never determine time.</p></article>
+      <article class="card"><h3>ViewModel</h3><p><code>VisualTimeViewModel.kt</code> owns the live session and state transitions. Search for <code>startDuration</code>, <code>publishSnapshot</code>, <code>pause</code>, and <code>restart</code>.</p></article>
+      <article class="card"><h3>Canvas renderer</h3><p><code>ui/hourglass/HourglassCanvas.kt</code> consumes only <code>progress</code> and <code>isFlowing</code>. <code>HourglassGeometry.kt</code> owns the shared wall profile, clipped sand paths, volume lookups, and fixed stream origin.</p></article>
+      <article class="card"><h3>Local persistence</h3><p><code>data/RecentDurationsRepository.kt</code> reads/writes one DataStore preference. <code>RecentDurationsPolicy.kt</code> keeps the three-item unique MRU rule pure and testable, including missing versus present-empty storage.</p></article>
+    </div>
+  </section>
+
+  <section aria-labelledby="route-title">
+    <h2 id="route-title">Three-stop reference route</h2>
+    <ol>
+      <li><strong>Input and visible state:</strong> open <code>app/src/main/java/com/kisss/visualtime/ui/VisualTimeScreen.kt</code>. Search for <code>VisualTimeScreen</code>, <code>SetupControls</code>, and <code>SharedHourglass</code>. This is where taps become ViewModel calls and immutable UI state becomes panels plus Canvas parameters.</li>
+      <li><strong>Authoritative behavior:</strong> open <code>app/src/main/java/com/kisss/visualtime/VisualTimeViewModel.kt</code>. Search for <code>startDuration</code> and <code>publishSnapshot</code>, then follow calls into <code>timer/TimerEngine.kt</code>. This boundary keeps countdown correctness independent from redraw frequency.</li>
+      <li><strong>Visible result and saved convenience:</strong> open <code>ui/hourglass/HourglassCanvas.kt</code> and <code>ui/hourglass/HourglassGeometry.kt</code> for rendering; open <code>data/RecentDurationsRepository.kt</code> and <code>RecentDurationsPolicy.kt</code> for the quick-start list.</li>
+    </ol>
+  </section>
+
+  <section aria-labelledby="change-title">
+    <h2 id="change-title">To change this, start here</h2>
+    <ul>
+      <li>Countdown arithmetic or pause/restart semantics: <code>TimerEngine.kt</code>, then <code>TimerEngineTest.kt</code> and <code>VisualTimeViewModelTest.kt</code>.</li>
+      <li>Hourglass silhouette, wall contact, sand volume, or stream: <code>HourglassGeometry.kt</code>; presentation loop and drawing order: <code>HourglassCanvas.kt</code>.</li>
+      <li>Three recent durations or seeding rules: <code>RecentDurationsPolicy.kt</code>, then <code>RecentDurationsRepository.kt</code> and <code>RecentDurationsPolicyTest.kt</code>.</li>
+      <li>Setup, overlays, shared control anchors, or About entry: <code>VisualTimeScreen.kt</code>; About content and external links: <code>AboutDialog.kt</code> and <code>res/values/strings.xml</code>.</li>
+      <li>Foreground/background completion delivery: start in <code>completion/</code> and <code>feedback/</code>; composition begins in <code>MainActivity.kt</code>.</li>
+    </ul>
+  </section>
+
+  <section class="panel" aria-labelledby="practice-title">
+    <h2 id="practice-title">A practice to reuse</h2>
+    <p>Separate the authoritative model from its visual projection, then verify each at the right boundary. In this project, <code>scope.md</code> protected “make time visible” as the kernel; <code>TimerEngineTest.startAndMidpointUseMonotonicElapsedTime</code> proves the clock model; the Slice 2 phone checkpoint proved the Canvas looked convincing on the real device. This pattern transfers well to another small app: define the observable result, isolate the rule that must remain correct, and schedule an early real-device check for the part that cannot be settled on paper.</p>
+  </section>
+
+  <section aria-labelledby="run-title">
+    <h2 id="run-title">Build and run again</h2>
+    <ol>
+      <li>Use JDK 17 and Android SDK Platform 37; keep the SDK path in ignored <code>local.properties</code>.</li>
+      <li>From the repository root run <code>.\gradlew.bat testDebugUnitTest assembleDebug</code>.</li>
+      <li>Install <code>app\build\outputs\apk\debug\app-debug.apk</code> on an Android 8.0+ device. The primary verified device was a Redmi Note 9 Pro running Android 12/API 31.</li>
+    </ol>
+  </section>
+</main>
+</body>
+</html>
