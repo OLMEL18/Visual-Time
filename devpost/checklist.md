@@ -60,7 +60,7 @@ Build mode: fast
   Learner check: On the phone, reveal and dismiss controls, pause with controls visible and hidden, resume, restart, and use on-screen/system Back. Confirm controls never move the hourglass or accidentally trigger the background tap.
   Commit: `Add timer overlay and session controls`
 
-- [ ] **6. The complete POC survives its real-device demo journey**
+- [x] **6. The complete POC survives its real-device demo journey**
   Becomes usable: The approved core journey works end to end on the Redmi Note 9 Pro, including live-process background catch-up, exact paused return, edge-to-edge safe controls, stable `adjustNothing` keyboard behavior, crash-safe orientation handling, final visual polish, and offline operation.
   Why now: This is integration and device evidence after each risky behavior already works in isolation. It catches Xiaomi-specific IME/inset behavior and lifecycle gaps without adding features or broadening the device matrix.
   PRD ref: `prd.md > The Core Journey`, `prd.md > Background, Relaunch, and System Back`, `prd.md > Look and Feel`, `prd.md > What We're Building`
@@ -68,6 +68,7 @@ Build mode: fast
   Build: Complete live-process foreground recomputation, expired-while-backgrounded transition, paused return, safe status/cutout/navigation insets, `adjustNothing`, portrait manifest policy, non-autofocus setup, stable hourglass sizing, theme/text polish, and any small fixes revealed by the agreed phone checks. Do not add process-death session restore, notifications, sounds, landscape polish, settings, Dial, or a custom keypad.
   Verify (mechanical): Run the full deterministic unit suite, targeted Compose/device tests, and `.\gradlew.bat assembleDebug`; reinstall the APK and execute the documented physical-device checklist for IME visibility/Done/Start/Back, overlay isolation, lifecycle return, expiry, MRU relaunch, and obvious performance/runaway work. Inspect final Git status/staged diff and push the verified milestone after a clean commit.
   Learner check: Perform the one-minute demo journey and then deliberately try awkward input, keyboard Back, active-session system Back, background/foreground, pause return, Repeat, and setup return. Note anything broken, confusing, visually weak, or worth refining for the final review.
+  Verification record: On 2026-10-22, the full unit/build tasks passed, the focused Compose tests remained green, and the debug APK was reinstalled on the Redmi Note 9 Pro. Device checks confirmed stationary top/hourglass geometry with panel-scoped IME clearance, keyboard-first Back, IME Done, live-process expiry catch-up, exact paused return, process-death setup fallback with persisted MRU, clean crash logs, stable foreground frame time, and no continued frame production while backgrounded. The app is left open at setup for the required learner review.
   Commit: `Complete Visual Time POC verification`
 
 ## Hands-on Checkpoints
