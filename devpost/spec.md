@@ -100,7 +100,6 @@ The primary device is already authorized over ADB:
 
 - Xiaomi **Redmi Note 9 Pro** as reported by ADB
 - Android 12 / API 31
-- Serial `[redacted-device-serial]`
 
 After `4-spec` approval and project creation in `5-build`, the exact local path is the repository root. The expected commands are:
 
