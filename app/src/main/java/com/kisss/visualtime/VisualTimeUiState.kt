@@ -7,6 +7,11 @@ enum class TimerPhase {
     Finished,
 }
 
+enum class BackgroundAlertWarning {
+    MayBeDelayed,
+    Unavailable,
+}
+
 data class VisualTimeUiState(
     val phase: TimerPhase = TimerPhase.Setup,
     val quickStartMinutes: List<Int> = emptyList(),
@@ -17,4 +22,5 @@ data class VisualTimeUiState(
     val elapsedProgress: Float = 0f,
     val formattedRemainingTime: String? = null,
     val overlayVisible: Boolean = false,
+    val backgroundAlertWarning: BackgroundAlertWarning? = null,
 )

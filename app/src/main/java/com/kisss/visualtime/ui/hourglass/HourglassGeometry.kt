@@ -8,6 +8,18 @@ import kotlin.math.abs
 import kotlin.math.min
 import kotlin.math.pow
 
+internal object HourglassLayoutMetrics {
+    const val CanvasHeightFraction = 0.68f
+    const val MaximumHeightFromWidth = 1.42f
+    const val FrameTopFraction = 0.095f
+    const val FrameBottomCapTopFraction = 0.869f
+    const val FrameCapHeightFraction = 0.030f
+    const val FrameBottomFraction = FrameBottomCapTopFraction + FrameCapHeightFraction
+
+    fun geometryHeight(canvasWidth: Float, canvasHeight: Float): Float =
+        min(canvasHeight * CanvasHeightFraction, canvasWidth * MaximumHeightFromWidth)
+}
+
 /**
  * All physical hourglass geometry comes from [physicalHalfWidthAt].
  * Glass tint/reflections may sit outside that boundary, but sand never uses a second profile.
@@ -251,7 +263,10 @@ internal class HourglassGeometry private constructor(
         private const val MAXIMUM_STREAM_WANDER_FRACTION = 0.004f
 
         fun from(canvasSize: Size): HourglassGeometry {
-            val hourglassHeight = min(canvasSize.height * 0.68f, canvasSize.width * 1.42f)
+            val hourglassHeight = HourglassLayoutMetrics.geometryHeight(
+                canvasWidth = canvasSize.width,
+                canvasHeight = canvasSize.height,
+            )
             val hourglassWidth = min(canvasSize.width * 0.76f, hourglassHeight * 0.68f)
             val left = (canvasSize.width - hourglassWidth) / 2f
             val top = (canvasSize.height - hourglassHeight) / 2f

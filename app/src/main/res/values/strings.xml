@@ -14,4 +14,11 @@
     <string name="resume">Resume</string>
     <string name="restart">Restart</string>
     <string name="back">Back</string>
+    <string name="time_is_up">Time is up</string>
+    <string name="timer_notification_channel">Timer completion</string>
+    <string name="timer_notification_channel_description">Alerts when a Visual Time timer finishes</string>
+    <string name="background_notifications_unavailable">Notifications are off; background completion alerts are unavailable.</string>
+    <string name="background_alert_may_be_delayed">Exact alarms are unavailable; background completion may be delayed.</string>
+    <string name="background_alert_unavailable">Background completion could not be scheduled on this device.</string>
+    <string name="exact_alarm_access_explanation">Allow Alarms &amp; reminders for precise background completion alerts. The timer still works if you decline.</string>
 </resources>

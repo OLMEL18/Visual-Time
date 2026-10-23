@@ -121,13 +121,19 @@ internal fun HourglassCanvas(
 
         drawRoundRect(
             brush = frameBrush,
-            topLeft = Offset(capLeft, geometry.top + geometry.height * 0.095f),
+            topLeft = Offset(
+                capLeft,
+                geometry.top + geometry.height * HourglassLayoutMetrics.FrameTopFraction,
+            ),
             size = Size(capWidth, capHeight),
             cornerRadius = CornerRadius(capHeight * 0.45f),
         )
         drawRoundRect(
             brush = frameBrush,
-            topLeft = Offset(capLeft, geometry.top + geometry.height * 0.869f),
+            topLeft = Offset(
+                capLeft,
+                geometry.top + geometry.height * HourglassLayoutMetrics.FrameBottomCapTopFraction,
+            ),
             size = Size(capWidth, capHeight),
             cornerRadius = CornerRadius(capHeight * 0.45f),
         )

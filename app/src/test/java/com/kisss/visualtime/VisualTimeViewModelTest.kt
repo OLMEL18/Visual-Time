@@ -1,8 +1,12 @@
 package com.kisss.visualtime
 
+import com.kisss.visualtime.completion.AlarmScheduleResult
+import com.kisss.visualtime.completion.CompletionAlarmScheduler
+import com.kisss.visualtime.completion.CompletionTokenFactory
 import com.kisss.visualtime.timer.MonotonicClock
 import com.kisss.visualtime.data.RecentDurationsPolicy
 import com.kisss.visualtime.data.RecentDurationsStore
+import com.kisss.visualtime.feedback.CompletionFeedback
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -194,8 +198,116 @@ class VisualTimeViewModelTest {
         assertEquals(TimerPhase.Setup, viewModel.uiState.value.phase)
     }
 
-    private fun createViewModel(clock: FakeMonotonicClock): VisualTimeViewModel =
-        VisualTimeViewModel(clock, FakeRecentDurationsStore())
+    @Test
+    fun completionFeedbackPlaysExactlyOncePerFinishedSession() = runBlocking {
+        val clock = FakeMonotonicClock()
+        val feedback = FakeCompletionFeedback()
+        val viewModel = createViewModel(clock, feedback)
+        viewModel.initializeRecentDurations()
+        viewModel.startQuickDuration(1)
+
+        viewModel.pause()
+        viewModel.resume()
+        viewModel.restart()
+        assertEquals(0, feedback.playCount)
+
+        clock.nowMillis = 60_000L
+        viewModel.refreshFromClock()
+        viewModel.refreshFromClock()
+        assertEquals(1, feedback.playCount)
+
+        viewModel.repeat()
+        clock.nowMillis = 120_000L
+        viewModel.refreshFromClock()
+        assertEquals(2, feedback.playCount)
+    }
+
+    @Test
+    fun completionAlarmsFollowStartPauseResumeRestartAndBack() = runBlocking {
+        val clock = FakeMonotonicClock()
+        val scheduler = FakeCompletionAlarmScheduler()
+        val tokens = ArrayDeque(listOf("start", "resume", "restart"))
+        val viewModel = createViewModel(
+            clock = clock,
+            completionAlarmScheduler = scheduler,
+            completionTokenFactory = CompletionTokenFactory { tokens.removeFirst() },
+        )
+        viewModel.initializeRecentDurations()
+
+        viewModel.startQuickDuration(1)
+        assertEquals(ScheduledAlarm("start", 60_000L), scheduler.scheduled.last())
+
+        clock.nowMillis = 10_000L
+        viewModel.pause()
+        assertEquals("start", scheduler.canceled.last())
+
+        clock.nowMillis = 20_000L
+        viewModel.resume()
+        assertEquals(ScheduledAlarm("resume", 70_000L), scheduler.scheduled.last())
+
+        clock.nowMillis = 30_000L
+        viewModel.restart()
+        assertEquals("resume", scheduler.canceled.last())
+        assertEquals(ScheduledAlarm("restart", 90_000L), scheduler.scheduled.last())
+
+        viewModel.backToSetup()
+        assertEquals("restart", scheduler.canceled.last())
+    }
+
+    @Test
+    fun consumedBackgroundClaimPreventsDuplicateForegroundFeedback() = runBlocking {
+        val clock = FakeMonotonicClock()
+        val feedback = FakeCompletionFeedback()
+        val scheduler = FakeCompletionAlarmScheduler(claimForeground = false)
+        val viewModel = createViewModel(
+            clock = clock,
+            completionFeedback = feedback,
+            completionAlarmScheduler = scheduler,
+        )
+        viewModel.initializeRecentDurations()
+        viewModel.startQuickDuration(1)
+
+        clock.nowMillis = 60_000L
+        viewModel.refreshFromClock()
+
+        assertEquals(TimerPhase.Finished, viewModel.uiState.value.phase)
+        assertEquals(0, feedback.playCount)
+        assertEquals(1, scheduler.dismissCount)
+    }
+
+    @Test
+    fun unavailableExactAlarmProducesConsumableWarningWithoutBlockingTimer() = runBlocking {
+        val scheduler = FakeCompletionAlarmScheduler(
+            scheduleResult = AlarmScheduleResult.InexactFallback,
+        )
+        val viewModel = createViewModel(
+            clock = FakeMonotonicClock(),
+            completionAlarmScheduler = scheduler,
+        )
+        viewModel.initializeRecentDurations()
+        viewModel.startQuickDuration(1)
+
+        assertEquals(TimerPhase.Running, viewModel.uiState.value.phase)
+        assertEquals(
+            BackgroundAlertWarning.MayBeDelayed,
+            viewModel.uiState.value.backgroundAlertWarning,
+        )
+        viewModel.consumeBackgroundAlertWarning()
+        assertNull(viewModel.uiState.value.backgroundAlertWarning)
+    }
+
+    private fun createViewModel(
+        clock: FakeMonotonicClock,
+        completionFeedback: CompletionFeedback = CompletionFeedback.None,
+        completionAlarmScheduler: CompletionAlarmScheduler = CompletionAlarmScheduler.None,
+        completionTokenFactory: CompletionTokenFactory = CompletionTokenFactory { "test-token" },
+    ): VisualTimeViewModel = VisualTimeViewModel(
+        clock = clock,
+        recentDurationsStore = FakeRecentDurationsStore(),
+        completionFeedback = completionFeedback,
+        completionAlarmScheduler = completionAlarmScheduler,
+        completionTokenFactory = completionTokenFactory,
+    )
 
     private class FakeMonotonicClock(
         var nowMillis: Long = 0L,
@@ -213,6 +325,46 @@ class VisualTimeViewModelTest {
         override suspend fun recordStarted(durationMinutes: Int): List<Int> {
             durations = RecentDurationsPolicy.recordStarted(durations, durationMinutes)
             return durations
+        }
+    }
+
+    private class FakeCompletionFeedback : CompletionFeedback {
+        var playCount = 0
+
+        override fun play() {
+            playCount += 1
+        }
+    }
+
+    private data class ScheduledAlarm(
+        val token: String,
+        val triggerElapsedRealtimeMillis: Long,
+    )
+
+    private class FakeCompletionAlarmScheduler(
+        private val scheduleResult: AlarmScheduleResult = AlarmScheduleResult.Exact,
+        private val claimForeground: Boolean = true,
+    ) : CompletionAlarmScheduler {
+        val scheduled = mutableListOf<ScheduledAlarm>()
+        val canceled = mutableListOf<String?>()
+        var dismissCount = 0
+
+        override fun schedule(
+            token: String,
+            triggerElapsedRealtimeMillis: Long,
+        ): AlarmScheduleResult {
+            scheduled += ScheduledAlarm(token, triggerElapsedRealtimeMillis)
+            return scheduleResult
+        }
+
+        override fun cancel(token: String?) {
+            canceled += token
+        }
+
+        override fun claimForForeground(token: String): Boolean = claimForeground
+
+        override fun dismissNotification() {
+            dismissCount += 1
         }
     }
 }

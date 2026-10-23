@@ -1,5 +1,7 @@
 package com.kisss.visualtime.ui
 
+import android.os.SystemClock
+import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -14,10 +16,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -30,20 +35,28 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -59,18 +72,62 @@ import com.kisss.visualtime.ui.theme.TrueBlack
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.awaitCancellation
 
 @Composable
 fun VisualTimeScreen(
     viewModel: VisualTimeViewModel,
     modifier: Modifier = Modifier,
+    onTimerStarted: () -> Unit = {},
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val hostView = LocalView.current
     val coroutineScope = rememberCoroutineScope()
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
     val timerSurfaceInteraction = remember { MutableInteractionSource() }
+    var finishedGraceActive by remember { mutableStateOf(false) }
+
+    LaunchedEffect(state.phase, lifecycleOwner) {
+        if (state.phase != TimerPhase.Finished) {
+            finishedGraceActive = false
+            return@LaunchedEffect
+        }
+
+        var accumulatedVisibleMillis = 0L
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            val visibleSegmentStartedAt = SystemClock.elapsedRealtime()
+            finishedGraceActive = true
+            try {
+                delay(
+                    (ScreenAwakePolicy.FinishedGraceMillis - accumulatedVisibleMillis)
+                        .coerceAtLeast(0L),
+                )
+                accumulatedVisibleMillis = ScreenAwakePolicy.FinishedGraceMillis
+                finishedGraceActive = false
+                awaitCancellation()
+            } finally {
+                if (accumulatedVisibleMillis < ScreenAwakePolicy.FinishedGraceMillis) {
+                    accumulatedVisibleMillis = (
+                        accumulatedVisibleMillis +
+                            (SystemClock.elapsedRealtime() - visibleSegmentStartedAt)
+                        ).coerceAtMost(ScreenAwakePolicy.FinishedGraceMillis)
+                }
+                finishedGraceActive = false
+            }
+        }
+    }
+
+    val keepScreenOn = ScreenAwakePolicy.shouldKeepScreenOn(
+        phase = state.phase,
+        finishedGraceActive = finishedGraceActive,
+    )
+    DisposableEffect(hostView, keepScreenOn) {
+        hostView.keepScreenOn = keepScreenOn
+        onDispose { hostView.keepScreenOn = false }
+    }
 
     BackHandler(enabled = state.phase != TimerPhase.Setup) {
         viewModel.onSystemBack()
@@ -78,6 +135,18 @@ fun VisualTimeScreen(
 
     LaunchedEffect(viewModel) {
         viewModel.initializeRecentDurations()
+    }
+
+    LaunchedEffect(state.backgroundAlertWarning) {
+        val warning = state.backgroundAlertWarning ?: return@LaunchedEffect
+        val message = when (warning) {
+            com.kisss.visualtime.BackgroundAlertWarning.MayBeDelayed ->
+                R.string.background_alert_may_be_delayed
+            com.kisss.visualtime.BackgroundAlertWarning.Unavailable ->
+                R.string.background_alert_unavailable
+        }
+        Toast.makeText(context, context.getString(message), Toast.LENGTH_LONG).show()
+        viewModel.consumeBackgroundAlertWarning()
     }
 
     LaunchedEffect(state.phase, lifecycleOwner) {
@@ -107,9 +176,10 @@ fun VisualTimeScreen(
                 },
             ),
     ) {
-        HourglassCanvas(
+        SharedHourglass(
             elapsedProgress = state.elapsedProgress,
             isFlowing = state.phase == TimerPhase.Running,
+            referenceMinutes = state.quickStartMinutes,
             modifier = Modifier.fillMaxSize(),
         )
 
@@ -119,37 +189,42 @@ fun VisualTimeScreen(
             exit = fadeOut(tween(SETUP_FADE_MILLIS)),
             modifier = Modifier.fillMaxSize(),
         ) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                SetupQuickStartPanel(
-                    minutes = state.quickStartMinutes,
-                    onQuickStart = { duration ->
-                        keyboardController?.hide()
-                        focusManager.clearFocus()
-                        coroutineScope.launch { viewModel.startQuickDuration(duration) }
-                    },
-                    modifier = Modifier.align(Alignment.TopCenter),
-                )
-                ManualDurationPanel(
-                    manualDraft = state.manualDraft,
-                    validationMessage = state.validationMessage,
-                    onManualDraftChanged = viewModel::onManualDraftChanged,
-                    onManualStart = {
-                        coroutineScope.launch {
-                            if (viewModel.startManualDuration()) {
-                                keyboardController?.hide()
-                                focusManager.clearFocus()
-                            }
+            SetupControls(
+                minutes = state.quickStartMinutes,
+                manualDraft = state.manualDraft,
+                validationMessage = state.validationMessage,
+                onQuickStart = { duration ->
+                    keyboardController?.hide()
+                    focusManager.clearFocus()
+                    coroutineScope.launch {
+                        viewModel.startQuickDuration(duration)
+                        onTimerStarted()
+                    }
+                },
+                onManualDraftChanged = viewModel::onManualDraftChanged,
+                onManualStart = {
+                    coroutineScope.launch {
+                        if (viewModel.startManualDuration()) {
+                            onTimerStarted()
+                            keyboardController?.hide()
+                            focusManager.clearFocus()
                         }
-                    },
-                    modifier = Modifier.align(Alignment.BottomCenter),
-                )
-            }
+                    }
+                },
+                modifier = Modifier.fillMaxSize(),
+            )
         }
 
         if (state.phase == TimerPhase.Finished) {
             FinishedContent(
                 formattedTime = state.formattedRemainingTime.orEmpty(),
-                onRepeat = { coroutineScope.launch { viewModel.repeat() } },
+                referenceMinutes = state.quickStartMinutes,
+                onRepeat = {
+                    coroutineScope.launch {
+                        viewModel.repeat()
+                        onTimerStarted()
+                    }
+                },
                 onBack = viewModel::backToSetup,
             )
         }
@@ -164,6 +239,7 @@ fun VisualTimeScreen(
             TimerOverlay(
                 formattedTime = state.formattedRemainingTime.orEmpty(),
                 isPaused = state.phase == TimerPhase.Paused,
+                referenceMinutes = state.quickStartMinutes,
                 onPauseResume = {
                     if (state.phase == TimerPhase.Paused) viewModel.resume() else viewModel.pause()
                 },
@@ -174,6 +250,169 @@ fun VisualTimeScreen(
 
         if (state.phase == TimerPhase.Paused && !state.overlayVisible) {
             PauseIndicator(modifier = Modifier.align(Alignment.TopCenter))
+        }
+    }
+}
+
+@Composable
+private fun SetupControls(
+    minutes: List<Int>,
+    manualDraft: String,
+    validationMessage: String?,
+    onQuickStart: (Int) -> Unit,
+    onManualDraftChanged: (String) -> Unit,
+    onManualStart: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(modifier = modifier) {
+        SharedTopControlHost(
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            SetupQuickStartPanel(minutes = minutes, onQuickStart = onQuickStart)
+        }
+        SharedBottomControlHost(
+            referenceMinutes = minutes,
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            ManualDurationPanel(
+                manualDraft = manualDraft,
+                validationMessage = validationMessage,
+                onManualDraftChanged = onManualDraftChanged,
+                onManualStart = onManualStart,
+            )
+        }
+    }
+}
+
+private enum class SharedLayoutSlot {
+    Hourglass,
+    TopReference,
+    BottomReference,
+    CurrentControls,
+}
+
+@Composable
+private fun SharedHourglass(
+    elapsedProgress: Float,
+    isFlowing: Boolean,
+    referenceMinutes: List<Int>,
+    modifier: Modifier = Modifier,
+) {
+    val density = LocalDensity.current
+    val imeBottom = WindowInsets.ime.getBottom(density)
+    val navigationBottom = WindowInsets.navigationBars.getBottom(density)
+    val keyboardLift = (imeBottom - navigationBottom).coerceAtLeast(0)
+
+    SubcomposeLayout(modifier = modifier) { constraints ->
+        val panelConstraints = constraints.copy(minWidth = 0, minHeight = 0)
+        val topReference = subcompose(SharedLayoutSlot.TopReference) {
+            SetupQuickStartPanel(minutes = referenceMinutes, onQuickStart = {})
+        }.single().measure(panelConstraints)
+        val bottomReference = subcompose(SharedLayoutSlot.BottomReference) {
+            ManualDurationPanel(
+                manualDraft = "",
+                validationMessage = null,
+                onManualDraftChanged = {},
+                onManualStart = {},
+            )
+        }.single().measure(panelConstraints)
+        val placement = SetupLayoutPolicy.calculate(
+            width = constraints.maxWidth,
+            height = constraints.maxHeight,
+            topPanelHeight = topReference.height,
+            bottomPanelRestingHeight = (bottomReference.height - keyboardLift).coerceAtLeast(0),
+            minimumGap = SETUP_MINIMUM_GAP_DP.dp.roundToPx(),
+        )
+        val hourglass = subcompose(SharedLayoutSlot.Hourglass) {
+            HourglassCanvas(
+                elapsedProgress = elapsedProgress,
+                isFlowing = isFlowing,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }.single().measure(
+            Constraints.fixed(constraints.maxWidth, placement.hourglassCanvasHeight),
+        )
+
+        layout(constraints.maxWidth, constraints.maxHeight) {
+            hourglass.placeRelative(0, placement.hourglassCanvasY)
+        }
+    }
+}
+
+@Composable
+private fun SharedTopControlHost(
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    val density = LocalDensity.current
+    val imeBottom = WindowInsets.ime.getBottom(density)
+    val navigationBottom = WindowInsets.navigationBars.getBottom(density)
+    val keyboardLift = (imeBottom - navigationBottom).coerceAtLeast(0)
+
+    SubcomposeLayout(modifier = modifier) { constraints ->
+        val panelConstraints = constraints.copy(minWidth = 0, minHeight = 0)
+        val topPanel = subcompose(SharedLayoutSlot.CurrentControls, content)
+            .single().measure(panelConstraints)
+        val bottomReference = subcompose(SharedLayoutSlot.BottomReference) {
+            ManualDurationPanel(
+                manualDraft = "",
+                validationMessage = null,
+                onManualDraftChanged = {},
+                onManualStart = {},
+            )
+        }.single().measure(panelConstraints)
+        val placement = SetupLayoutPolicy.calculate(
+            width = constraints.maxWidth,
+            height = constraints.maxHeight,
+            topPanelHeight = topPanel.height,
+            bottomPanelRestingHeight = (bottomReference.height - keyboardLift).coerceAtLeast(0),
+            minimumGap = SETUP_MINIMUM_GAP_DP.dp.roundToPx(),
+        )
+
+        layout(constraints.maxWidth, constraints.maxHeight) {
+            topPanel.placeRelative(0, placement.topPanelY)
+        }
+    }
+}
+
+@Composable
+private fun SharedBottomControlHost(
+    referenceMinutes: List<Int>,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    val density = LocalDensity.current
+    val imeBottom = WindowInsets.ime.getBottom(density)
+    val navigationBottom = WindowInsets.navigationBars.getBottom(density)
+    val keyboardLift = (imeBottom - navigationBottom).coerceAtLeast(0)
+
+    SubcomposeLayout(modifier = modifier) { constraints ->
+        val panelConstraints = constraints.copy(minWidth = 0, minHeight = 0)
+        val topReference = subcompose(SharedLayoutSlot.TopReference) {
+            SetupQuickStartPanel(minutes = referenceMinutes, onQuickStart = {})
+        }.single().measure(panelConstraints)
+        val bottomReference = subcompose(SharedLayoutSlot.BottomReference) {
+            ManualDurationPanel(
+                manualDraft = "",
+                validationMessage = null,
+                onManualDraftChanged = {},
+                onManualStart = {},
+            )
+        }.single().measure(panelConstraints)
+        val currentControls = subcompose(SharedLayoutSlot.CurrentControls, content)
+            .single().measure(panelConstraints)
+        val placement = SetupLayoutPolicy.calculate(
+            width = constraints.maxWidth,
+            height = constraints.maxHeight,
+            topPanelHeight = topReference.height,
+            bottomPanelRestingHeight = (bottomReference.height - keyboardLift).coerceAtLeast(0),
+            minimumGap = SETUP_MINIMUM_GAP_DP.dp.roundToPx(),
+        )
+        val keyboardSafeY = constraints.maxHeight - currentControls.height
+        val currentY = minOf(placement.bottomPanelRestingY, keyboardSafeY)
+
+        layout(constraints.maxWidth, constraints.maxHeight) {
+            currentControls.placeRelative(0, currentY)
         }
     }
 }
@@ -289,6 +528,7 @@ private fun ManualDurationPanel(
 @Composable
 private fun FinishedContent(
     formattedTime: String,
+    referenceMinutes: List<Int>,
     onRepeat: () -> Unit,
     onBack: () -> Unit,
 ) {
@@ -316,45 +556,57 @@ private fun FinishedContent(
             )
         }
 
-        Surface(
-            color = DarkCharcoal.copy(alpha = 0.94f),
-            shape = RoundedCornerShape(18.dp),
-            tonalElevation = 0.dp,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .navigationBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-                .widthIn(max = 520.dp)
-                .fillMaxWidth(),
+        SharedBottomControlHost(
+            referenceMinutes = referenceMinutes,
+            modifier = Modifier.fillMaxSize(),
         ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.padding(14.dp),
+            FinishedControlPanel(onRepeat = onRepeat, onBack = onBack)
+        }
+    }
+}
+
+@Composable
+private fun FinishedControlPanel(
+    onRepeat: () -> Unit,
+    onBack: () -> Unit,
+) {
+    Surface(
+        color = DarkCharcoal.copy(alpha = 0.94f),
+        shape = RoundedCornerShape(18.dp),
+        tonalElevation = 0.dp,
+        modifier = Modifier
+            .navigationBarsPadding()
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .widthIn(max = 520.dp)
+            .fillMaxWidth(),
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(14.dp),
+        ) {
+            Button(
+                onClick = onRepeat,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = SandGold,
+                    contentColor = TrueBlack,
+                ),
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = 48.dp),
             ) {
-                Button(
-                    onClick = onRepeat,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = SandGold,
-                        contentColor = TrueBlack,
-                    ),
-                    modifier = Modifier
-                        .weight(1f)
-                        .heightIn(min = 48.dp),
-                ) {
-                    Text(stringResource(R.string.repeat))
-                }
-                Button(
-                    onClick = onBack,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = DarkCharcoal,
-                        contentColor = SoftWhite,
-                    ),
-                    modifier = Modifier
-                        .weight(1f)
-                        .heightIn(min = 48.dp),
-                ) {
-                    Text(stringResource(R.string.back_to_setup))
-                }
+                Text(stringResource(R.string.repeat))
+            }
+            Button(
+                onClick = onBack,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = DarkCharcoal,
+                    contentColor = SoftWhite,
+                ),
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = 48.dp),
+            ) {
+                Text(stringResource(R.string.back_to_setup))
             }
         }
     }
@@ -364,6 +616,7 @@ private fun FinishedContent(
 internal fun TimerOverlay(
     formattedTime: String,
     isPaused: Boolean,
+    referenceMinutes: List<Int>,
     onPauseResume: () -> Unit,
     onRestart: () -> Unit,
     onBack: () -> Unit,
@@ -391,38 +644,57 @@ internal fun TimerOverlay(
             )
         }
 
-        Surface(
-            color = DarkCharcoal.copy(alpha = 0.94f),
-            shape = RoundedCornerShape(18.dp),
-            tonalElevation = 0.dp,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .navigationBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-                .widthIn(max = 520.dp)
-                .fillMaxWidth(),
+        SharedBottomControlHost(
+            referenceMinutes = referenceMinutes,
+            modifier = Modifier.fillMaxSize(),
         ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.padding(14.dp),
-            ) {
-                OverlayButton(
-                    text = stringResource(if (isPaused) R.string.resume else R.string.pause),
-                    emphasized = true,
-                    onClick = onPauseResume,
-                    modifier = Modifier.weight(1f),
-                )
-                OverlayButton(
-                    text = stringResource(R.string.restart),
-                    onClick = onRestart,
-                    modifier = Modifier.weight(1f),
-                )
-                OverlayButton(
-                    text = stringResource(R.string.back),
-                    onClick = onBack,
-                    modifier = Modifier.weight(1f),
-                )
-            }
+            TimerControlPanel(
+                isPaused = isPaused,
+                onPauseResume = onPauseResume,
+                onRestart = onRestart,
+                onBack = onBack,
+            )
+        }
+    }
+}
+
+@Composable
+private fun TimerControlPanel(
+    isPaused: Boolean,
+    onPauseResume: () -> Unit,
+    onRestart: () -> Unit,
+    onBack: () -> Unit,
+) {
+    Surface(
+        color = DarkCharcoal.copy(alpha = 0.94f),
+        shape = RoundedCornerShape(18.dp),
+        tonalElevation = 0.dp,
+        modifier = Modifier
+            .navigationBarsPadding()
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .widthIn(max = 520.dp)
+            .fillMaxWidth(),
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.padding(14.dp),
+        ) {
+            OverlayButton(
+                text = stringResource(if (isPaused) R.string.resume else R.string.pause),
+                emphasized = true,
+                onClick = onPauseResume,
+                modifier = Modifier.weight(1f),
+            )
+            OverlayButton(
+                text = stringResource(R.string.restart),
+                onClick = onRestart,
+                modifier = Modifier.weight(1f),
+            )
+            OverlayButton(
+                text = stringResource(R.string.back),
+                onClick = onBack,
+                modifier = Modifier.weight(1f),
+            )
         }
     }
 }
@@ -471,3 +743,4 @@ private fun PauseIndicator(modifier: Modifier = Modifier) {
 private const val TIMER_PULSE_MILLIS = 50L
 private const val SETUP_FADE_MILLIS = 220
 private const val OVERLAY_FADE_MILLIS = 160
+private const val SETUP_MINIMUM_GAP_DP = 12

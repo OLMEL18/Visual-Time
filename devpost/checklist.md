@@ -7,6 +7,9 @@ status: approved
 
 Build mode: fast
 
+Final-review refinements through the shared Setup, Running, Paused, and Finished
+control-panel anchor were explicitly approved on 2026-10-23.
+
 ## Slices
 
 - [x] **1. The approved Android shell builds cleanly**
@@ -74,10 +77,14 @@ Build mode: fast
 ## Hands-on Checkpoints
 
 - [x] Required pause after slice 2: learner completed the expanded 0%/25%/50%/75%/90%/98%/99%/99.5%/100% hourglass review on the Redmi Note 9 Pro and explicitly approved the prototype before timer/UI expansion
-- [ ] Required pause after slice 6: final kick-the-tires exploration and feedback completed
+- [x] Required pause after slice 6: final kick-the-tires exploration and feedback completed on the Redmi Note 9 Pro; the learner explicitly approved the current timer, alerts, icon, and shared control-panel layout on 2026-10-23
 
 ## Final Review
 
+- [x] Checkpoint A retested by learner — screen-awake policy and one-shot foreground completion feedback approved
+- [x] Checkpoint B retested by learner — background/locked-screen completion notification approved
+- [x] Approved launcher icon retested by learner — adaptive, legacy, and round launcher presentation approved
+- [x] Shared control spacing retested by learner — Setup, Running, Paused, and Finished panels use the same frame-relative anchor with safe keyboard/navigation insets
 - [ ] Final review complete — feedback resolved and learner confirms ready to ship
 
 ## Code Tour and App Map

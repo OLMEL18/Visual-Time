@@ -33,6 +33,7 @@ class TimerOverlayInteractionTest {
                     TimerOverlay(
                         formattedTime = "25:00",
                         isPaused = false,
+                        referenceMinutes = listOf(15, 25, 40),
                         onPauseResume = { pauseTaps += 1 },
                         onRestart = {},
                         onBack = {},
@@ -57,6 +58,7 @@ class TimerOverlayInteractionTest {
                 TimerOverlay(
                     formattedTime = "01:30:00",
                     isPaused = true,
+                    referenceMinutes = listOf(15, 25, 40),
                     onPauseResume = {},
                     onRestart = {},
                     onBack = {},

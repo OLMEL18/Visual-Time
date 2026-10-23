@@ -1,8 +1,12 @@
 package com.kisss.visualtime
 
 import androidx.lifecycle.ViewModel
+import com.kisss.visualtime.completion.AlarmScheduleResult
+import com.kisss.visualtime.completion.CompletionAlarmScheduler
+import com.kisss.visualtime.completion.CompletionTokenFactory
 import com.kisss.visualtime.data.RecentDurationsPolicy
 import com.kisss.visualtime.data.RecentDurationsStore
+import com.kisss.visualtime.feedback.CompletionFeedback
 import com.kisss.visualtime.timer.DurationFormatter
 import com.kisss.visualtime.timer.DurationInputValidator
 import com.kisss.visualtime.timer.MonotonicClock
@@ -11,10 +15,16 @@ import com.kisss.visualtime.timer.TimerSession
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.util.UUID
 
 class VisualTimeViewModel(
     private val clock: MonotonicClock,
     private val recentDurationsStore: RecentDurationsStore,
+    private val completionFeedback: CompletionFeedback = CompletionFeedback.None,
+    private val completionAlarmScheduler: CompletionAlarmScheduler = CompletionAlarmScheduler.None,
+    private val completionTokenFactory: CompletionTokenFactory = CompletionTokenFactory {
+        UUID.randomUUID().toString()
+    },
 ) : ViewModel() {
     private val mutableUiState = MutableStateFlow(VisualTimeUiState())
     val uiState: StateFlow<VisualTimeUiState> = mutableUiState.asStateFlow()
@@ -22,6 +32,7 @@ class VisualTimeViewModel(
     private var session: TimerSession? = null
     private var recentDurationsInitialized = false
     private var overlayHideDeadlineElapsedMillis: Long? = null
+    private var completionAlarmToken: String? = null
 
     suspend fun initializeRecentDurations() {
         if (recentDurationsInitialized) return
@@ -104,6 +115,7 @@ class VisualTimeViewModel(
         val currentSession = session ?: return
         val now = clock.elapsedRealtimeMillis()
         val pausedSession = TimerEngine.pause(currentSession, now)
+        cancelCompletionAlarm()
         session = pausedSession
         overlayHideDeadlineElapsedMillis = null
         publishSnapshot(pausedSession, forcedPhase = TimerPhase.Paused, nowElapsedMillis = now)
@@ -117,6 +129,7 @@ class VisualTimeViewModel(
         val resumedSession = TimerEngine.resume(currentSession, now)
         session = resumedSession
         publishSnapshot(resumedSession, forcedPhase = TimerPhase.Running, nowElapsedMillis = now)
+        scheduleCompletionAlarm(resumedSession, now)
         mutableUiState.value = mutableUiState.value.copy(overlayVisible = true)
         overlayHideDeadlineElapsedMillis = now + OVERLAY_TIMEOUT_MILLIS
     }
@@ -124,10 +137,12 @@ class VisualTimeViewModel(
     fun restart() {
         val currentSession = session ?: return
         val now = clock.elapsedRealtimeMillis()
+        cancelCompletionAlarm()
         val restartedSession = TimerEngine.restart(currentSession, now)
         session = restartedSession
         overlayHideDeadlineElapsedMillis = null
         publishSnapshot(restartedSession, forcedPhase = TimerPhase.Running, nowElapsedMillis = now)
+        scheduleCompletionAlarm(restartedSession, now)
         mutableUiState.value = mutableUiState.value.copy(overlayVisible = false)
     }
 
@@ -138,6 +153,7 @@ class VisualTimeViewModel(
     }
 
     fun backToSetup() {
+        cancelCompletionAlarm()
         session = null
         overlayHideDeadlineElapsedMillis = null
         mutableUiState.value = mutableUiState.value.copy(
@@ -149,6 +165,10 @@ class VisualTimeViewModel(
         )
     }
 
+    fun consumeBackgroundAlertWarning() {
+        mutableUiState.value = mutableUiState.value.copy(backgroundAlertWarning = null)
+    }
+
     private suspend fun startDuration(durationMinutes: Int) {
         val optimisticRecents = RecentDurationsPolicy.recordStarted(
             current = mutableUiState.value.quickStartMinutes,
@@ -156,6 +176,7 @@ class VisualTimeViewModel(
         )
         val now = clock.elapsedRealtimeMillis()
         val newSession = TimerEngine.start(durationMinutes, now)
+        cancelCompletionAlarm()
         session = newSession
         overlayHideDeadlineElapsedMillis = null
         mutableUiState.value = mutableUiState.value.copy(
@@ -166,6 +187,7 @@ class VisualTimeViewModel(
             overlayVisible = false,
         )
         publishSnapshot(newSession, forcedPhase = TimerPhase.Running, nowElapsedMillis = now)
+        scheduleCompletionAlarm(newSession, now)
         val persistedRecents = recentDurationsStore.recordStarted(durationMinutes)
         mutableUiState.value = mutableUiState.value.copy(quickStartMinutes = persistedRecents)
     }
@@ -175,6 +197,7 @@ class VisualTimeViewModel(
         forcedPhase: TimerPhase? = null,
         nowElapsedMillis: Long = clock.elapsedRealtimeMillis(),
     ) {
+        val previousPhase = mutableUiState.value.phase
         val snapshot = TimerEngine.snapshot(currentSession, nowElapsedMillis)
         val phase = when {
             snapshot.expired -> TimerPhase.Finished
@@ -197,6 +220,46 @@ class VisualTimeViewModel(
             ),
             overlayVisible = if (snapshot.expired) false else mutableUiState.value.overlayVisible,
         )
+        if (snapshot.expired && previousPhase != TimerPhase.Finished) {
+            val token = completionAlarmToken
+            val deliverForegroundFeedback = token == null ||
+                completionAlarmScheduler.claimForForeground(token)
+            completionAlarmToken = null
+            completionAlarmScheduler.dismissNotification()
+            if (deliverForegroundFeedback) completionFeedback.play()
+        }
+    }
+
+    private fun scheduleCompletionAlarm(
+        currentSession: TimerSession,
+        nowElapsedMillis: Long,
+    ) {
+        val token = completionTokenFactory.create()
+        completionAlarmToken = token
+        val remainingMillis = TimerEngine.snapshot(currentSession, nowElapsedMillis).remainingMillis
+        when (
+            completionAlarmScheduler.schedule(
+                token = token,
+                triggerElapsedRealtimeMillis = nowElapsedMillis + remainingMillis,
+            )
+        ) {
+            AlarmScheduleResult.Exact -> Unit
+            AlarmScheduleResult.InexactFallback -> {
+                mutableUiState.value = mutableUiState.value.copy(
+                    backgroundAlertWarning = BackgroundAlertWarning.MayBeDelayed,
+                )
+            }
+            AlarmScheduleResult.Unavailable -> {
+                mutableUiState.value = mutableUiState.value.copy(
+                    backgroundAlertWarning = BackgroundAlertWarning.Unavailable,
+                )
+            }
+        }
+    }
+
+    private fun cancelCompletionAlarm() {
+        completionAlarmScheduler.cancel(completionAlarmToken)
+        completionAlarmToken = null
     }
 
     private fun revealOverlay() {
